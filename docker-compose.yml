@@ -1,0 +1,99 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: velvet-postgres
+    environment:
+      POSTGRES_DB: velvet
+      POSTGRES_USER: velvet
+      POSTGRES_PASSWORD: velvet
+    # Host 5432 is already used by another stack — map to 5433
+    ports:
+      - "5433:5432"
+    volumes:
+      - velvet_pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U velvet -d velvet"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: velvet-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  minio:
+    image: minio/minio:latest
+    container_name: velvet-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: velvet
+      MINIO_ROOT_PASSWORD: velvetsecret
+    # Object storage is private; the API is the only media gateway.
+    volumes:
+      - velvet_minio:/data
+
+  minio-init:
+    image: minio/mc:latest
+    depends_on:
+      - minio
+    entrypoint: >
+      /bin/sh -c "
+      sleep 4;
+      mc alias set local http://minio:9000 velvet velvetsecret;
+      mc mb -p local/velvet || true;
+      exit 0;
+      "
+
+  api:
+    build:
+      context: ./services/api
+      dockerfile: Dockerfile
+    container_name: velvet-api
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: velvet
+      DB_USER: velvet
+      DB_PASSWORD: velvet
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      # These defaults are local-development only. Production must set VELVET_ENV=production
+      # and provide non-default values; ProductionConfigValidator rejects unsafe settings.
+      VELVET_ENV: ${VELVET_ENV:-local}
+      JWT_SECRET: ${JWT_SECRET:-local-dev-secret-change-me-must-be-at-least-32-chars!!}
+      OTP_EXPOSE: ${OTP_EXPOSE:-true}
+      VELVET_SEED_RESET: ${VELVET_SEED_RESET:-true}
+      S3_ENDPOINT: http://minio:9000
+      S3_ACCESS_KEY: velvet
+      S3_SECRET_KEY: velvetsecret
+      S3_BUCKET: velvet
+      # Relative /v1/media/{key} URLs — phones only need API port 8088
+      S3_PUBLIC_BASE: relative
+      ADMIN_BOOTSTRAP_PHONE: ${ADMIN_BOOTSTRAP_PHONE:-+251911000000}
+      # CBE receipt verification. Values are supplied by the ignored root .env file.
+      CBE_VERIFIER_MODE: ${CBE_VERIFIER_MODE:-mock}
+      CBE_VERIFIER_BASE_URL: ${CBE_VERIFIER_BASE_URL:-https://verifyapi.leulzenebe.pro}
+      CBE_VERIFIER_API_KEY: ${CBE_VERIFIER_API_KEY:-}
+      CBE_ACCOUNT_NUMBER: ${CBE_ACCOUNT_NUMBER:-1000123456789}
+      CBE_ACCOUNT_SUFFIX: ${CBE_ACCOUNT_SUFFIX:-12345678}
+    # Host 8080 already used — map to 8088
+    ports:
+      - "8088:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+
+volumes:
+  velvet_pg:
+  velvet_minio:

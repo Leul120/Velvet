@@ -1,0 +1,163 @@
+spring:
+  application:
+    name: velvet-api
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:velvet}
+    username: ${DB_USER:velvet}
+    password: ${DB_PASSWORD:velvet}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+  servlet:
+    multipart:
+      max-file-size: 50MB
+      max-request-size: 55MB
+
+server:
+  port: ${SERVER_PORT:8080}
+  error:
+    include-message: always
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: when_authorized
+
+velvet:
+  # local | production — production fails fast if SMS/push/CBE/OTP are not live-ready
+  env: ${VELVET_ENV:local}
+  jwt:
+    secret: ${JWT_SECRET:change-me-to-a-long-random-secret-at-least-256-bits-long!!}
+    access-token-minutes: 30
+    refresh-token-days: 30
+  otp:
+    length: 6
+    ttl-seconds: 300
+    max-attempts: 5
+    # Dev only: logs OTP to console / returns in response when true
+    expose-in-response: ${OTP_EXPOSE:true}
+  invites:
+    # Seed invite for local development
+    bootstrap-code: VELVET-SEED
+  cors:
+    allowed-origins: ${CORS_ORIGINS:*}
+  admin:
+    # First login with this phone is promoted to ADMIN (local/dev)
+    bootstrap-phone: ${ADMIN_BOOTSTRAP_PHONE:+251911000000}
+  jobs:
+    match-expiry-ms: 60000
+    subscription-expiry-ms: 60000
+    booking-reminder-ms: 300000
+    data-retention-ms: ${DATA_RETENTION_MS:3600000}
+  retention:
+    # Scrub panic GPS after N days (PDPP minimization)
+    location-days: ${RETENTION_LOCATION_DAYS:7}
+  seed:
+    # Wipe + reseed demo members on every API start (local/dev). Forced off in production.
+    reset-on-startup: ${VELVET_SEED_RESET:true}
+  sms:
+    # log | http — http posts JSON {to,from,message} to velvet.sms.http-url
+    provider: ${SMS_PROVIDER:log}
+    http-url: ${SMS_HTTP_URL:}
+    api-key: ${SMS_API_KEY:}
+    sender-id: ${SMS_SENDER_ID:VELVET}
+  push:
+    # log | http — http posts JSON {token,title,body} (FCM proxy / Cloud Function)
+    provider: ${PUSH_PROVIDER:log}
+    http-url: ${PUSH_HTTP_URL:}
+    api-key: ${PUSH_API_KEY:}
+  rate-limits:
+    otp-per-hour: ${RL_OTP_PER_HOUR:10}
+    chat-per-minute: ${RL_CHAT_PER_MINUTE:30}
+    panic-per-hour: ${RL_PANIC_PER_HOUR:3}
+    report-per-hour: ${RL_REPORT_PER_HOUR:10}
+  moderation:
+    # rule | http — http posts {text,lang} for Amharic/NLP assist
+    # Local stub: MODERATION_PROVIDER=http MODERATION_HTTP_URL=http://localhost:8080/v1/internal/moderation/score
+    provider: ${MODERATION_PROVIDER:rule}
+    http-url: ${MODERATION_HTTP_URL:}
+    api-key: ${MODERATION_API_KEY:}
+  storage:
+    endpoint: ${S3_ENDPOINT:http://localhost:9000}
+    region: ${S3_REGION:us-east-1}
+    access-key: ${S3_ACCESS_KEY:velvet}
+    secret-key: ${S3_SECRET_KEY:velvetsecret}
+    bucket: ${S3_BUCKET:velvet}
+    # "relative" → store /v1/media/{key} (served by MediaController). Absolute MinIO URL still supported.
+    public-base-url: ${S3_PUBLIC_BASE:relative}
+  billing:
+    # cbe (default — CBE screenshot via verifier-api) | telebirr (legacy H5)
+    provider: ${BILLING_PROVIDER:cbe}
+  cbe-verifier:
+    # mock | direct | live — direct calls CBE's public receipt PDF; live calls verifier-api
+    mode: ${CBE_VERIFIER_MODE:mock}
+    base-url: ${CBE_VERIFIER_BASE_URL:https://verifyapi.leulzenebe.pro}
+    api-key: ${CBE_VERIFIER_API_KEY:}
+  cbe-payment:
+    account-name: ${CBE_ACCOUNT_NAME:VELVET Ethiopia}
+    account-number: ${CBE_ACCOUNT_NUMBER:1000123456789}
+    # Last 8 digits required by verifier-api for CBE image/reference verify
+    account-suffix: ${CBE_ACCOUNT_SUFFIX:12345678}
+    bank-name: ${CBE_BANK_NAME:Commercial Bank of Ethiopia}
+  telebirr:
+    # mock | live — only used when BILLING_PROVIDER=telebirr
+    mode: ${TELEBIRR_MODE:mock}
+    mock-base-url: ${TELEBIRR_MOCK_BASE:http://localhost:8080}
+    base-url: ${TELEBIRR_BASE_URL:https://developerportal.ethiotelebirr.et:38443/apiaccess/payment/gateway}
+    web-base-url: ${TELEBIRR_WEB_BASE_URL:https://developerportal.ethiotelebirr.et:38443/payment/web/paygate?}
+    fabric-app-id: ${TELEBIRR_FABRIC_APP_ID:}
+    app-secret: ${TELEBIRR_APP_SECRET:}
+    merchant-app-id: ${TELEBIRR_MERCHANT_APP_ID:}
+    merchant-code: ${TELEBIRR_MERCHANT_CODE:}
+    private-key-pem: ${TELEBIRR_PRIVATE_KEY_PEM:}
+    public-key-pem: ${TELEBIRR_PUBLIC_KEY_PEM:}
+    notify-url: ${TELEBIRR_NOTIFY_URL:http://localhost:8080/v1/billing/telebirr/notify}
+    return-url: ${TELEBIRR_RETURN_URL:http://localhost:8080/admin}
+  concierge:
+    sms-phones: ${CONCIERGE_SMS_PHONES:+251911000000}
+    require-geofence: ${REQUIRE_GEOFENCE:false}
+  legal:
+    # Bump when Terms / Privacy / Community Guidelines change (forces re-accept)
+    document-set-version: ${LEGAL_DOCUMENT_SET_VERSION:v2-2026-08}
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+
+logging:
+  level:
+    com.velvet: INFO
+    org.springframework.security: INFO
+
+---
+spring:
+  config:
+    activate:
+      on-profile: test
+  datasource:
+    url: jdbc:tc:postgresql:16:///velvet
+  data:
+    redis:
+      host: localhost
+      port: 6379
+velvet:
+  otp:
+    expose-in-response: true

@@ -1,0 +1,35 @@
+.idea/
+.vscode/
+*.iml
+.DS_Store
+
+# Java / Maven
+services/api/target/
+services/api/out/
+*.class
+*.jar
+!services/api/.mvn/wrapper/maven-wrapper.jar
+
+# Legacy Gradle caches (if present)
+services/api/.gradle/
+services/api/build/
+
+# Flutter
+apps/mobile/.dart_tool/
+apps/mobile/.packages
+apps/mobile/build/
+apps/mobile/.flutter-plugins
+apps/mobile/.flutter-plugins-dependencies
+apps/mobile/.pub-cache/
+apps/mobile/ios/Pods/
+apps/mobile/.android/
+**/*.g.dart
+**/*.freezed.dart
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log

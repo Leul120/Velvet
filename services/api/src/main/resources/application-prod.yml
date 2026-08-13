@@ -1,0 +1,29 @@
+# Activate with: SPRING_PROFILES_ACTIVE=prod  (and VELVET_ENV=production)
+# See docs/ops/production-checklist.md
+velvet:
+  env: production
+  otp:
+    expose-in-response: false
+  jobs:
+    match-expiry-ms: 300000
+    subscription-expiry-ms: 300000
+    booking-reminder-ms: 60000
+    data-retention-ms: 3600000
+  retention:
+    location-days: 7
+  concierge:
+    require-geofence: true
+  cbe-verifier:
+    mode: live
+  sms:
+    provider: http
+  push:
+    provider: http
+  moderation:
+    # Prefer http NLP in production when available; rule remains a safe fallback if unset carefully
+    provider: ${MODERATION_PROVIDER:rule}
+
+logging:
+  level:
+    root: INFO
+    com.velvet: INFO

@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>VELVET — Request an invite</title>
+  <style>
+    :root { --ink:#1c1917; --cream:#faf7f2; --sand:#e7e0d5; --emerald:#0f5c4c; --danger:#9f1239; }
+    body { margin:0; min-height:100vh; font-family:"Iowan Old Style","Palatino Linotype",Palatino,serif;
+      background:linear-gradient(155deg,#efe8dc,#dfece7 45%,#f6f1ea); color:var(--ink); }
+    main { max-width:520px; margin:0 auto; padding:3rem 1.25rem 4rem; }
+    h1 { letter-spacing:.22em; font-weight:600; margin:0 0 .75rem; }
+    p { line-height:1.5; color:rgba(28,25,23,.72); }
+    .card { margin-top:1.75rem; background:rgba(255,255,255,.75); border:1px solid var(--sand); border-radius:18px; padding:1.25rem; }
+    label { display:block; margin:.85rem 0 .35rem; font-size:.92rem; }
+    input, textarea, button { width:100%; font:inherit; padding:.7rem .85rem; border-radius:10px; border:1px solid var(--sand); }
+    button { margin-top:1rem; background:var(--emerald); color:var(--cream); border-color:var(--emerald); cursor:pointer; }
+    .ok { color:var(--emerald); } .err { color:var(--danger); }
+    a { color:var(--emerald); }
+  </style>
+</head>
+<body>
+<main>
+  <h1>VELVET</h1>
+  <p>Invite-only introductions in Ethiopia. No invite yet? Share your interest — we’ll review carefully.</p>
+  <div class="card" id="formCard">
+    <label>Phone (+251…)</label>
+    <input id="phone" value="+2519" />
+    <label>Display name</label>
+    <input id="name" />
+    <label>City</label>
+    <input id="city" value="Addis Ababa" />
+    <label>Why you’d like to join</label>
+    <textarea id="note" rows="3"></textarea>
+    <button onclick="submitApp()">Submit application</button>
+    <p id="msg"></p>
+  </div>
+  <p><a href="/admin/">Staff</a> · <a href="/partner/">Venue partners</a></p>
+</main>
+<script>
+async function submitApp() {
+  const msg = document.getElementById('msg');
+  msg.className = ''; msg.textContent = 'Submitting…';
+  try {
+    const res = await fetch('/v1/waitlist', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        phoneE164: document.getElementById('phone').value.trim(),
+        displayName: document.getElementById('name').value.trim() || null,
+        city: document.getElementById('city').value.trim() || 'Addis Ababa',
+        note: document.getElementById('note').value.trim() || null
+      })
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.message || res.statusText);
+    msg.className = 'ok';
+    msg.textContent = 'You’re on the list. We’ll SMS an invite if approved.';
+    document.getElementById('formCard').querySelectorAll('input,textarea,button').forEach(el => el.disabled = true);
+  } catch (e) {
+    msg.className = 'err';
+    msg.textContent = e.message || String(e);
+  }
+}
+</script>
+</body>
+</html>

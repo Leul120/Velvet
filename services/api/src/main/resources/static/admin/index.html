@@ -1,0 +1,832 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>VELVET Admin</title>
+  <style>
+    :root { --ink:#1a1614; --cream:#f7f2ea; --emerald:#0f5c4c; --sand:#e8dcc8; --danger:#8b2e2e; --gold:#b08d57; }
+    * { box-sizing: border-box; }
+    body { margin:0; font-family: Georgia, "Times New Roman", serif; background:linear-gradient(160deg,#efe6d6,#f7f2ea 40%,#e7f0ec); color:var(--ink); }
+    header { padding:1.25rem 1.5rem; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--sand); }
+    h1 { margin:0; letter-spacing:.2em; font-weight:600; font-size:1.1rem; }
+    main { max-width:1100px; margin:0 auto; padding:1.5rem; }
+    .card { background:rgba(255,255,255,.72); border:1px solid var(--sand); border-radius:16px; padding:1rem 1.25rem; margin-bottom:1rem; }
+    input, select, button, textarea { font:inherit; padding:.55rem .7rem; border-radius:10px; border:1px solid var(--sand); }
+    button { background:var(--emerald); color:var(--cream); border:none; cursor:pointer; }
+    button.secondary { background:transparent; color:var(--emerald); border:1px solid var(--emerald); }
+    button.danger { background:var(--danger); }
+    .row { display:flex; gap:.5rem; flex-wrap:wrap; align-items:center; }
+    .muted { opacity:.65; font-size:.9rem; }
+    table { width:100%; border-collapse:collapse; }
+    th, td { text-align:left; padding:.55rem .35rem; border-bottom:1px solid var(--sand); vertical-align:top; font-size:.92rem; }
+    .hidden { display:none; }
+    #toast { position:fixed; bottom:1rem; right:1rem; background:var(--ink); color:var(--cream); padding:.7rem 1rem; border-radius:10px; display:none; }
+    nav.tabs { display:flex; gap:.5rem; margin-bottom:1rem; flex-wrap:wrap; }
+    nav.tabs button { background:transparent; color:var(--ink); border:1px solid var(--sand); }
+    nav.tabs button.active { background:var(--emerald); color:var(--cream); border-color:var(--emerald); }
+    @media (max-width: 700px) {
+      main { padding: 1rem; }
+      table { display:block; overflow-x:auto; white-space:nowrap; }
+    }
+  </style>
+</head>
+<body>
+<header>
+  <h1>VELVET ADMIN</h1>
+  <div id="authStatus" class="muted">Not signed in</div>
+</header>
+<main>
+  <section id="login" class="card">
+    <h2>Staff sign-in</h2>
+    <p class="muted">Use bootstrap admin phone <code>+251911000000</code> + invite <code>VELVET-SEED</code> on first login.</p>
+    <div class="row">
+      <input id="phone" value="+251911000000" placeholder="+251..." />
+      <input id="invite" value="VELVET-SEED" placeholder="Invite" />
+      <button onclick="requestOtp()">Request OTP</button>
+    </div>
+    <div class="row" style="margin-top:.75rem">
+      <input id="otp" placeholder="OTP" />
+      <button onclick="verifyOtp()">Verify</button>
+    </div>
+    <p id="devOtp" class="muted"></p>
+  </section>
+
+  <section id="console" class="hidden">
+    <nav class="tabs">
+      <button class="active" data-tab="verification" onclick="showTab('verification')">Verification</button>
+      <button data-tab="photos" onclick="showTab('photos')">Photo review</button>
+      <button data-tab="members" onclick="showTab('members')">Members</button>
+      <button data-tab="matches" onclick="showTab('matches')">Create connection</button>
+      <button data-tab="panics" onclick="showTab('panics')">Panics</button>
+      <button data-tab="reports" onclick="showTab('reports')">Reports</button>
+      <button data-tab="outbox" onclick="showTab('outbox')">Outbox</button>
+      <button data-tab="held" onclick="showTab('held')">Held chat</button>
+      <button data-tab="invites" onclick="showTab('invites')">Invites</button>
+      <button data-tab="venues" onclick="showTab('venues')">Venues</button>
+      <button data-tab="waitlist" onclick="showTab('waitlist')">Waitlist</button>
+      <button data-tab="payouts" onclick="showTab('payouts')">Payouts</button>
+      <button data-tab="metrics" onclick="showTab('metrics')">Metrics</button>
+      <button data-tab="audit" onclick="showTab('audit')">Audit</button>
+      <button data-tab="shifts" onclick="showTab('shifts')">Shifts</button>
+      <button data-tab="concierge" onclick="showTab('concierge')">Meetings</button>
+      <button class="secondary" onclick="logout()">Sign out</button>
+    </nav>
+
+    <div id="tab-verification" class="card tab">
+      <div class="row" style="justify-content:space-between">
+        <h2>Verification queue</h2>
+        <button class="secondary" onclick="loadVerification()">Refresh</button>
+      </div>
+      <table><thead><tr><th>Case</th><th>User</th><th>Status</th><th>Actions</th></tr></thead><tbody id="verifBody"></tbody></table>
+    </div>
+
+    <div id="tab-photos" class="card tab hidden">
+      <div class="row" style="justify-content:space-between">
+        <div><h2>Profile photo review</h2><p class="muted">Only approved photos appear in Browse.</p></div>
+        <button class="secondary" onclick="loadPhotoReview()">Refresh</button>
+      </div>
+      <table><thead><tr><th>Member</th><th>Photos</th><th>Notes</th><th>Actions</th></tr></thead><tbody id="photoReviewBody"></tbody></table>
+    </div>
+
+    <div id="tab-members" class="card tab hidden">
+      <div class="row" style="justify-content:space-between">
+        <h2>Members</h2>
+        <div class="row">
+          <input id="memberSearch" placeholder="Search phone / name / id" onkeydown="if(event.key==='Enter')loadMembers()" />
+          <select id="memberStatusFilter">
+            <option value="">Any status</option>
+            <option>VERIFIED</option><option>ACTIVE</option><option>APPLIED</option><option>UNDER_REVIEW</option>
+          </select>
+          <button class="secondary" onclick="loadMembers()">Refresh</button>
+        </div>
+      </div>
+      <table><thead><tr><th>Phone</th><th>Name</th><th>Status</th><th>Role</th><th>Notes</th><th>ID / actions</th></tr></thead><tbody id="memberBody"></tbody></table>
+    </div>
+
+    <div id="tab-matches" class="card tab hidden">
+      <h2>Create curated connection</h2>
+      <p class="muted">Member A must have an active Telebirr subscription (quota is consumed from A). Search then click Use as A/B.</p>
+      <div class="row">
+        <input id="matchSearch" placeholder="Find member for connection…" style="min-width:220px" />
+        <button class="secondary" onclick="searchMatchMembers()">Search</button>
+      </div>
+      <pre id="matchSearchResults" class="muted"></pre>
+      <div class="row">
+        <input id="memberA" placeholder="Member A UUID (subscriber)" style="min-width:280px" />
+        <input id="memberB" placeholder="Member B UUID" style="min-width:280px" />
+      </div>
+      <div class="row" style="margin-top:.5rem">
+        <input id="venueId" placeholder="Venue UUID (optional)" style="min-width:280px" />
+        <input id="noteEn" placeholder="Intro note (EN)" style="min-width:280px" />
+        <input id="noteAm" placeholder="Intro note (AM)" style="min-width:280px" />
+      </div>
+      <div class="row" style="margin-top:.75rem">
+        <button onclick="createMatch()">Create connection</button>
+        <button class="secondary" onclick="loadVenues()">Load venues into console</button>
+      </div>
+      <pre id="venueList" class="muted"></pre>
+    </div>
+
+    <div id="tab-panics" class="card tab hidden">
+      <div class="row" style="justify-content:space-between">
+        <h2>Open panic alerts</h2>
+        <button class="secondary" onclick="loadPanics()">Refresh</button>
+      </div>
+      <table><thead><tr><th>Time</th><th>User</th><th>Note</th><th></th></tr></thead><tbody id="panicBody"></tbody></table>
+    </div>
+
+    <div id="tab-reports" class="card tab hidden">
+      <div class="row" style="justify-content:space-between">
+        <h2>Open reports</h2>
+        <button class="secondary" onclick="loadReports()">Refresh</button>
+      </div>
+      <table><thead><tr><th>Category</th><th>Details</th><th>Reporter</th><th></th></tr></thead><tbody id="reportBody"></tbody></table>
+    </div>
+
+    <div id="tab-outbox" class="card tab hidden">
+      <div class="row" style="justify-content:space-between">
+        <h2>Notification outbox</h2>
+        <button class="secondary" onclick="loadOutbox()">Refresh</button>
+      </div>
+      <p class="muted">SMS / PUSH / LOG rows (panic, reports, subscription expiry).</p>
+      <table><thead><tr><th>Time</th><th>Channel</th><th>To</th><th>Status</th><th>Body</th></tr></thead><tbody id="outboxBody"></tbody></table>
+    </div>
+
+    <div id="tab-held" class="card tab hidden">
+      <div class="row" style="justify-content:space-between">
+        <h2>Held messages</h2>
+        <button class="secondary" onclick="loadHeld()">Refresh</button>
+      </div>
+      <p class="muted">Off-platform / address-flagged messages — hidden from peers until approved.</p>
+      <table><thead><tr><th>Age</th><th>Connection</th><th>Flags</th><th>Body</th><th></th></tr></thead><tbody id="heldBody"></tbody></table>
+    </div>
+
+    <div id="tab-invites" class="card tab hidden">
+      <h2>Invite codes</h2>
+      <div class="row">
+        <input id="inviteCode" placeholder="Code (optional)" />
+        <input id="inviteMax" type="number" value="1" min="1" style="width:5rem" title="Max uses" />
+        <input id="inviteDays" type="number" value="30" min="1" style="width:5rem" title="Expires days" />
+        <button onclick="createInvite()">Create invite</button>
+        <button class="secondary" onclick="loadInvites()">Refresh</button>
+      </div>
+      <table style="margin-top:1rem"><thead><tr><th>Code</th><th>Uses</th><th>Active</th><th>Expires</th><th></th></tr></thead><tbody id="inviteBody"></tbody></table>
+    </div>
+
+    <div id="tab-venues" class="card tab hidden">
+      <h2>Partner venues</h2>
+      <div class="row">
+        <input id="vName" placeholder="Name" style="min-width:180px" />
+        <input id="vNameAm" placeholder="Name (Am)" style="min-width:140px" />
+        <input id="vCity" value="Addis Ababa" style="width:8rem" />
+        <select id="vCategory">
+          <option>RESTAURANT</option><option>CAFE</option><option>HOTEL</option><option>LOUNGE</option><option>OTHER</option>
+        </select>
+      </div>
+      <div class="row" style="margin-top:.5rem">
+        <input id="vAddress" placeholder="Address" style="min-width:280px" />
+        <select id="vPrivacy"><option>STANDARD</option><option>DISCREET</option></select>
+        <input id="vLat" placeholder="Lat" style="width:6rem" />
+        <input id="vLng" placeholder="Lng" style="width:6rem" />
+        <input id="vGeo" type="number" value="400" style="width:5rem" title="Geofence m" />
+        <button onclick="createVenue()">Add venue</button>
+        <button class="secondary" onclick="loadAdminVenues()">Refresh</button>
+      </div>
+      <div class="row" style="margin-top:.5rem">
+        <input id="vPartner" placeholder="Partner user UUID" style="min-width:280px" />
+        <button class="secondary" onclick="assignSelectedPartner()">Assign partner to last venue id</button>
+      </div>
+      <table style="margin-top:1rem"><thead><tr><th>Name</th><th>City</th><th>Category</th><th>Partner</th><th>Active</th><th></th></tr></thead><tbody id="adminVenueBody"></tbody></table>
+    </div>
+
+    <div id="tab-waitlist" class="card tab hidden">
+      <div class="row" style="justify-content:space-between">
+        <h2>Waitlist applications</h2>
+        <button class="secondary" onclick="loadWaitlist()">Refresh</button>
+      </div>
+      <table><thead><tr><th>Phone</th><th>Name</th><th>City</th><th>Status</th><th>Invite</th><th></th></tr></thead><tbody id="waitlistBody"></tbody></table>
+    </div>
+
+    <div id="tab-payouts" class="card tab hidden">
+      <div class="row" style="justify-content:space-between">
+        <h2>Performer payouts</h2>
+        <div class="row">
+          <select id="payoutStatusFilter" onchange="loadPayouts()">
+            <option value="REQUESTED">REQUESTED</option>
+            <option value="PAID">PAID</option>
+            <option value="REJECTED">REJECTED</option>
+          </select>
+          <button class="secondary" onclick="loadPayouts()">Refresh</button>
+        </div>
+      </div>
+      <p class="muted">Mark paid after sending CBE/Telebirr. Reject restores the performer's available balance.</p>
+      <table><thead><tr><th>When</th><th>Performer</th><th>Amount</th><th>Destination</th><th>Status</th><th></th></tr></thead><tbody id="payoutBody"></tbody></table>
+    </div>
+
+    <div id="tab-metrics" class="card tab hidden">
+      <div class="row" style="justify-content:space-between">
+        <h2>Ops metrics</h2>
+        <div class="row">
+          <button class="secondary" onclick="loadMetrics()">Refresh</button>
+          <button class="secondary" onclick="loadModeration()">Moderation events</button>
+          <button class="secondary" onclick="loadReadiness()">Readiness</button>
+        </div>
+      </div>
+      <pre id="metricsBody" class="muted"></pre>
+      <h3>Moderation calibration</h3>
+      <pre id="moderationBody" class="muted"></pre>
+    </div>
+
+    <div id="tab-audit" class="card tab hidden">
+      <div class="row" style="justify-content:space-between">
+        <h2>Audit log</h2>
+        <div class="row">
+          <input id="auditAction" placeholder="Action filter" />
+          <button class="secondary" onclick="loadAudit()">Refresh</button>
+        </div>
+      </div>
+      <table><thead><tr><th>Time</th><th>Action</th><th>Actor</th><th>Entity</th><th>Meta</th></tr></thead><tbody id="auditBody"></tbody></table>
+    </div>
+
+    <div id="tab-shifts" class="card tab hidden">
+      <h2>Staff shifts / on-call</h2>
+      <div class="row">
+        <input id="shiftUser" placeholder="Staff user UUID" style="min-width:260px" />
+        <input id="shiftStart" placeholder="Starts ISO" style="min-width:180px" />
+        <input id="shiftEnd" placeholder="Ends ISO" style="min-width:180px" />
+        <input id="shiftRole" value="CONCIERGE" style="width:8rem" />
+        <button onclick="createShift()">Add shift</button>
+        <button class="secondary" onclick="loadShifts()">Refresh</button>
+      </div>
+      <p class="muted">On-call now:</p>
+      <pre id="onCallBody" class="muted"></pre>
+      <table style="margin-top:1rem"><thead><tr><th>User</th><th>Window</th><th>Role</th><th>On-call</th><th></th></tr></thead><tbody id="shiftBody"></tbody></table>
+    </div>
+
+    <div id="tab-concierge" class="card tab hidden">
+      <div class="row" style="justify-content:space-between">
+        <h2>Concierge meetings &amp; tasks</h2>
+        <button class="secondary" onclick="loadConcierge()">Refresh</button>
+      </div>
+      <p class="muted">PRE_CALL (T−30m) · ARRIVAL_CHECK (T+15m no check-in) · FOLLOW_UP (after meeting). Unacked tasks escalate after 15m.</p>
+      <h3>Open tasks</h3>
+      <table><thead><tr><th>Type</th><th>Due</th><th>Status</th><th>Notes</th><th></th></tr></thead><tbody id="conciergeTaskBody"></tbody></table>
+      <h3 style="margin-top:1.25rem">Upcoming / recent meetings</h3>
+      <table><thead><tr><th>Venue</th><th>Starts</th><th>Status</th><th>Check-in</th><th>Connection</th></tr></thead><tbody id="conciergeMeetingBody"></tbody></table>
+    </div>
+  </section>
+</main>
+<div id="toast"></div>
+<script>
+const API = location.origin;
+// Keep staff credentials only in memory. A page refresh requires a fresh OTP,
+// which limits the impact of any future rendering bug in this static console.
+let token = '';
+let staffRole = '';
+
+function esc(value) {
+  return String(value ?? '').replace(/[&<>"']/g, char => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  })[char]);
+}
+
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.style.display = 'block';
+  setTimeout(() => el.style.display = 'none', 2800);
+}
+
+// Inline console actions are async. Surface failures instead of leaving staff
+// with an apparently unresponsive button.
+window.addEventListener('unhandledrejection', event => {
+  const reason = event.reason;
+  toast(reason instanceof Error ? reason.message : 'Something went wrong. Please try again.');
+  event.preventDefault();
+});
+
+async function api(path, opts = {}) {
+  const headers = Object.assign({ 'Content-Type': 'application/json', 'Accept': 'application/json' }, opts.headers || {});
+  if (token) headers.Authorization = 'Bearer ' + token;
+  const res = await fetch(API + path, { ...opts, headers });
+  const text = await res.text();
+  let data = null;
+  try { data = text ? JSON.parse(text) : null; } catch { data = text; }
+  if (!res.ok) throw new Error((data && data.message) || res.statusText);
+  return data;
+}
+
+function showConsole(on) {
+  document.getElementById('login').classList.toggle('hidden', on);
+  document.getElementById('console').classList.toggle('hidden', !on);
+  document.getElementById('authStatus').textContent = on
+    ? `Signed in${staffRole ? ' · ' + staffRole : ''}`
+    : 'Not signed in';
+}
+
+function openRoleWorkspace() {
+  // Concierges begin with their active meeting queue; administrators begin
+  // with verification. The underlying API still enforces all permissions.
+  showTab(staffRole === 'CONCIERGE' ? 'concierge' : 'verification');
+}
+
+function showTab(name) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.add('hidden'));
+  document.getElementById('tab-' + name).classList.remove('hidden');
+  document.querySelectorAll('nav.tabs button[data-tab]').forEach(b => b.classList.toggle('active', b.dataset.tab === name));
+}
+
+async function requestOtp() {
+  const phone = document.getElementById('phone').value.trim();
+  const inviteCode = document.getElementById('invite').value.trim();
+  const data = await api('/v1/auth/otp/request', { method: 'POST', body: JSON.stringify({ phone, inviteCode, deviceId: 'admin-web', platform: 'web' }) });
+  document.getElementById('devOtp').textContent = data.devOtp ? ('Dev OTP: ' + data.devOtp) : 'OTP sent';
+  if (data.devOtp) document.getElementById('otp').value = data.devOtp;
+  toast('OTP requested');
+}
+
+async function verifyOtp() {
+  const phone = document.getElementById('phone').value.trim();
+  const code = document.getElementById('otp').value.trim();
+  const data = await api('/v1/auth/otp/verify', { method: 'POST', body: JSON.stringify({ phone, code, deviceId: 'admin-web', platform: 'web' }) });
+  token = data.accessToken;
+  staffRole = data.user.role || '';
+  if (data.user.role !== 'ADMIN' && data.user.role !== 'CONCIERGE') {
+    token = '';
+    staffRole = '';
+    toast('This account has role ' + data.user.role + ' and cannot use the staff console.');
+    showConsole(false);
+    return;
+  }
+  showConsole(true);
+  openRoleWorkspace();
+  loadVerification(); loadPhotoReview(); loadMembers(); loadPanics(); loadReports(); loadOutbox(); loadHeld(); loadInvites(); loadAdminVenues(); loadWaitlist(); loadPayouts(); loadMetrics(); loadAudit(); loadShifts(); loadConcierge();
+}
+
+function logout() {
+  token = '';
+  staffRole = '';
+  showConsole(false);
+}
+
+async function loadVerification() {
+  const rows = await api('/v1/admin/verification/queue');
+  document.getElementById('verifBody').innerHTML = rows.map(r => `
+    <tr>
+      <td><code>${r.id.slice(0,8)}</code></td>
+      <td><code>${r.userId.slice(0,8)}</code></td>
+      <td>${esc(r.status)}</td>
+      <td class="row">
+        <button onclick="review('${r.id}', true)">Approve</button>
+        <button class="danger" onclick="review('${r.id}', false)">Reject</button>
+      </td>
+    </tr>`).join('') || '<tr><td colspan="4" class="muted">Queue empty</td></tr>';
+}
+
+async function review(id, approve) {
+  await api('/v1/admin/verification/' + id + '/review', { method: 'POST', body: JSON.stringify({ approve, notes: approve ? 'Approved' : 'Rejected' }) });
+  toast(approve ? 'Approved' : 'Rejected');
+  loadVerification(); loadMembers();
+}
+
+async function loadPhotoReview() {
+  const rows = await api('/v1/admin/photos/review-queue');
+  document.getElementById('photoReviewBody').innerHTML = rows.map(r => {
+    const photos = (r.photoUrls || []).map(url => {
+      const safeUrl = esc(encodeURI(String(url || '')));
+      return `<a href="${safeUrl}" target="_blank" rel="noopener"><img src="${safeUrl}" alt="Profile photo" style="width:56px;height:56px;object-fit:cover;border-radius:8px;margin-right:5px"></a>`;
+    }).join('');
+    return `<tr><td>${esc(r.displayName || 'Member')}<br><code>${esc(r.userId.slice(0,8))}</code></td><td>${photos || '<span class="muted">No photos</span>'}</td><td>${esc(r.notes || '')}</td><td class="row"><button onclick="reviewPhotos('${r.userId}',true)">Approve</button><button class="danger" onclick="reviewPhotos('${r.userId}',false)">Reject</button></td></tr>`;
+  }).join('') || '<tr><td colspan="4" class="muted">No photos waiting for review</td></tr>';
+}
+
+async function reviewPhotos(userId, approve) {
+  const notes = prompt(approve ? 'Approval note (optional)' : 'Rejection reason') || '';
+  if (!approve && !notes.trim()) return;
+  await api('/v1/admin/members/' + userId + '/photos/review', { method:'POST', body: JSON.stringify({approve, notes}) });
+  toast(approve ? 'Photos approved' : 'Photos rejected and listing hidden');
+  loadPhotoReview(); loadMembers();
+}
+
+async function loadMembers() {
+  const q = document.getElementById('memberSearch')?.value?.trim() || '';
+  const status = document.getElementById('memberStatusFilter')?.value || '';
+  const params = new URLSearchParams();
+  if (q) params.set('q', q);
+  if (status) params.set('status', status);
+  const qs = params.toString() ? ('?' + params.toString()) : '';
+  const rows = await api('/v1/admin/members' + qs);
+  document.getElementById('memberBody').innerHTML = rows.map(r => `
+    <tr>
+      <td>${esc(r.phone)}</td><td>${esc(r.displayName || '')}</td><td>${esc(r.status)}</td><td>${esc(r.role)}</td>
+      <td>
+        <input style="width:10rem" value="${esc(r.conciergeNotes || '')}" id="notes-${r.id}" />
+        <button class="secondary" onclick="saveNotes('${r.id}')">Save</button>
+      </td>
+      <td><code>${r.id}</code>
+        <button class="secondary" onclick="document.getElementById('memberA').value='${r.id}';showTab('matches')">A</button>
+        <button class="secondary" onclick="document.getElementById('memberB').value='${r.id}';showTab('matches')">B</button>
+        <button class="secondary" onclick="setMemberStatus('${r.id}','SUSPENDED')">Suspend</button>
+        <button class="secondary" onclick="setMemberStatus('${r.id}','ACTIVE')">Activate</button>
+        <button class="secondary" onclick="setMemberStatus('${r.id}','BANNED')">Ban</button>
+        <button class="secondary" onclick="promoteMember('${r.id}','CONCIERGE')">→ Concierge</button>
+      </td>
+    </tr>`).join('');
+}
+
+async function saveNotes(id) {
+  const notes = document.getElementById('notes-' + id).value;
+  await api('/v1/admin/members/' + id + '/notes', { method: 'PATCH', body: JSON.stringify({ notes }) });
+  toast('Notes saved');
+}
+
+async function setMemberStatus(id, status) {
+  if (!confirm('Set status to ' + status + '?')) return;
+  await api('/v1/admin/members/' + id + '/status', { method: 'PATCH', body: JSON.stringify({ status }) });
+  toast('Status → ' + status);
+  await loadMembers();
+}
+
+async function promoteMember(id, role) {
+  if (!confirm('Promote to ' + role + '?')) return;
+  await api('/v1/admin/members/promote', { method: 'POST', body: JSON.stringify({ userId: id, role }) });
+  toast('Role → ' + role);
+  await loadMembers();
+}
+
+async function searchMatchMembers() {
+  const q = document.getElementById('matchSearch').value.trim();
+  if (!q) return;
+  const rows = await api('/v1/admin/members?q=' + encodeURIComponent(q));
+  document.getElementById('matchSearchResults').innerHTML = rows.map(r =>
+    `${esc(r.phone)} ${esc(r.displayName || '')} [${esc(r.status)}] <button class="secondary" onclick="document.getElementById('memberA').value='${r.id}'">A</button> <button class="secondary" onclick="document.getElementById('memberB').value='${r.id}'">B</button>`
+  ).join('\\n') || 'No results';
+}
+
+async function loadVenues() {
+  const rows = await api('/v1/venues');
+  document.getElementById('venueList').textContent = rows.map(v => `${v.id}  ${v.name}`).join('\n');
+  if (rows[0]) document.getElementById('venueId').value = rows[0].id;
+}
+
+async function createMatch() {
+  const body = {
+    memberAId: document.getElementById('memberA').value.trim(),
+    memberBId: document.getElementById('memberB').value.trim(),
+    suggestedVenueId: document.getElementById('venueId').value.trim() || null,
+    introNoteEn: document.getElementById('noteEn').value.trim() || 'Looking forward to a thoughtful introduction.',
+    introNoteAm: document.getElementById('noteAm').value.trim() || undefined,
+    expiresInHours: 72
+  };
+  if (!body.suggestedVenueId) delete body.suggestedVenueId;
+  if (!body.introNoteAm) delete body.introNoteAm;
+  const m = await api('/v1/admin/connections', { method: 'POST', body: JSON.stringify(body) });
+  toast('Connection created: ' + m.id);
+}
+
+async function loadPanics() {
+  const rows = await api('/v1/admin/safety/panics');
+  document.getElementById('panicBody').innerHTML = rows.map(r => `
+    <tr>
+      <td>${esc(r.createdAt)}</td>
+      <td><code>${r.userId.slice(0,8)}</code></td>
+      <td>${esc(r.note || '')}</td>
+      <td><button class="danger" onclick="ackPanic('${r.id}')">Ack</button></td>
+    </tr>`).join('') || '<tr><td colspan="4" class="muted">No open panics</td></tr>';
+}
+
+async function ackPanic(id) {
+  await api('/v1/admin/safety/panics/' + id + '/ack', { method: 'POST', body: '{}' });
+  toast('Acknowledged');
+  loadPanics();
+}
+
+async function loadReports() {
+  const rows = await api('/v1/admin/safety/reports');
+  document.getElementById('reportBody').innerHTML = rows.map(r => `
+    <tr>
+      <td>${esc(r.category)}</td>
+      <td>${esc(r.details)}</td>
+      <td><code>${r.reporterId.slice(0,8)}</code></td>
+      <td class="row">
+        <button onclick="reviewReport('${r.id}', 'TRIAGED')">Triage</button>
+        <button onclick="reviewReport('${r.id}', 'RESOLVED')">Resolve</button>
+        <button class="danger" onclick="reviewReport('${r.id}', 'DISMISSED')">Dismiss</button>
+      </td>
+    </tr>
+  `).join('') || '<tr><td colspan="4" class="muted">No open reports</td></tr>';
+}
+
+async function reviewReport(id, status) {
+  await api('/v1/admin/safety/reports/' + id + '/review', {
+    method: 'POST',
+    body: JSON.stringify({ status, notes: status })
+  });
+  toast(status);
+  loadReports();
+}
+
+async function loadOutbox() {
+  const rows = await api('/v1/admin/notifications/outbox');
+  document.getElementById('outboxBody').innerHTML = rows.map(r => `
+    <tr>
+      <td>${esc(r.createdAt)}</td>
+      <td>${esc(r.channel)}</td>
+      <td>${esc(r.recipient)}</td>
+      <td>${esc(r.status)}</td>
+      <td>${esc((r.body || '').slice(0, 120))}</td>
+    </tr>
+  `).join('') || '<tr><td colspan="5" class="muted">Outbox empty</td></tr>';
+}
+
+async function loadHeld() {
+  const rows = await api('/v1/admin/chat/held');
+  document.getElementById('heldBody').innerHTML = rows.map(r => `
+    <tr>
+      <td>${esc(r.ageMinutes != null ? (r.ageMinutes + 'm') : r.createdAt)}${r.ageMinutes >= 15 ? ' ⚠' : ''}</td>
+      <td><code>${(r.connectionId || r.matchId || '').slice(0,8)}</code></td>
+      <td>${esc((r.flags || []).join(', '))}</td>
+      <td>${esc(r.body)}</td>
+      <td class="row">
+        <button onclick="reviewHeld('${r.id}', true)">Allow</button>
+        <button class="danger" onclick="reviewHeld('${r.id}', false)">Block</button>
+      </td>
+    </tr>
+  `).join('') || '<tr><td colspan="5" class="muted">No held messages</td></tr>';
+}
+
+async function reviewHeld(id, approve) {
+  await api('/v1/admin/chat/held/' + id + '/review', { method: 'POST', body: JSON.stringify({ approve }) });
+  toast(approve ? 'Allowed' : 'Blocked');
+  loadHeld();
+}
+
+async function loadInvites() {
+  const rows = await api('/v1/admin/invites');
+  document.getElementById('inviteBody').innerHTML = rows.map(r => `
+    <tr>
+      <td><code>${esc(r.code)}</code></td>
+      <td>${esc(r.useCount)}/${esc(r.maxUses)}</td>
+      <td>${r.active ? (r.usable ? 'usable' : 'exhausted') : 'off'}</td>
+      <td>${esc(r.expiresAt || '—')}</td>
+      <td>${r.active ? `<button class="danger" onclick="deactivateInvite('${r.id}')">Deactivate</button>` : ''}</td>
+    </tr>
+  `).join('') || '<tr><td colspan="5" class="muted">No invites</td></tr>';
+}
+
+async function createInvite() {
+  const body = {
+    code: document.getElementById('inviteCode').value.trim() || null,
+    maxUses: Number(document.getElementById('inviteMax').value) || 1,
+    expiresInDays: Number(document.getElementById('inviteDays').value) || 30
+  };
+  if (!body.code) delete body.code;
+  const row = await api('/v1/admin/invites', { method: 'POST', body: JSON.stringify(body) });
+  toast('Created ' + row.code);
+  document.getElementById('inviteCode').value = '';
+  loadInvites();
+}
+
+async function deactivateInvite(id) {
+  await api('/v1/admin/invites/' + id + '/deactivate', { method: 'POST', body: '{}' });
+  toast('Deactivated');
+  loadInvites();
+}
+
+async function loadAdminVenues() {
+  const rows = await api('/v1/admin/venues');
+  document.getElementById('adminVenueBody').innerHTML = rows.map(v => `
+    <tr>
+      <td>${esc(v.name)}<div class="muted"><code>${esc(v.id.slice(0,8))}</code></div></td>
+      <td>${esc(v.city)}</td>
+      <td>${esc(v.category)} · ${esc(v.privacyLevel)}</td>
+      <td>${v.partnerUserId ? `<code>${v.partnerUserId.slice(0,8)}</code>` : '—'}</td>
+      <td>${v.active ? 'yes' : 'no'}</td>
+      <td>
+        <button class="secondary" onclick="toggleVenue('${v.id}', ${!v.active})">${v.active ? 'Deactivate' : 'Activate'}</button>
+        <button class="secondary" onclick="useVenue('${v.id}')">Use in connection</button>
+        <button class="secondary" onclick="assignPartner('${v.id}')">Assign partner</button>
+      </td>
+    </tr>
+  `).join('') || '<tr><td colspan="6" class="muted">No venues</td></tr>';
+}
+
+async function createVenue() {
+  const body = {
+    name: document.getElementById('vName').value.trim(),
+    nameAm: document.getElementById('vNameAm').value.trim() || null,
+    city: document.getElementById('vCity').value.trim(),
+    category: document.getElementById('vCategory').value,
+    addressLine: document.getElementById('vAddress').value.trim(),
+    privacyLevel: document.getElementById('vPrivacy').value,
+    latitude: Number(document.getElementById('vLat').value) || null,
+    longitude: Number(document.getElementById('vLng').value) || null,
+    geofenceMeters: Number(document.getElementById('vGeo').value) || 400,
+    active: true
+  };
+  if (!body.nameAm) delete body.nameAm;
+  if (body.latitude == null) delete body.latitude;
+  if (body.longitude == null) delete body.longitude;
+  const v = await api('/v1/admin/venues', { method: 'POST', body: JSON.stringify(body) });
+  toast('Created ' + v.name);
+  document.getElementById('vName').value = '';
+  document.getElementById('vAddress').value = '';
+  loadAdminVenues();
+}
+
+async function toggleVenue(id, active) {
+  await api('/v1/admin/venues/' + id + '/active?active=' + active, { method: 'POST', body: '{}' });
+  toast(active ? 'Activated' : 'Deactivated');
+  loadAdminVenues();
+}
+
+
+async function loadWaitlist() {
+  const rows = await api('/v1/admin/waitlist');
+  document.getElementById('waitlistBody').innerHTML = rows.map(r => `
+    <tr>
+      <td>${esc(r.phoneE164)}</td>
+      <td>${esc(r.displayName || '—')}</td>
+      <td>${esc(r.city)}</td>
+      <td>${esc(r.status)}</td>
+      <td>${esc(r.inviteCode || '—')}</td>
+      <td class="row">
+        ${r.status === 'PENDING' ? `<button onclick="approveWaitlist('${r.id}')">Approve</button>
+        <button class="danger" onclick="rejectWaitlist('${r.id}')">Reject</button>` : ''}
+      </td>
+    </tr>`).join('') || '<tr><td colspan="6" class="muted">No pending applications</td></tr>';
+}
+async function approveWaitlist(id) {
+  const row = await api('/v1/admin/waitlist/' + id + '/approve', { method: 'POST', body: '{}' });
+  toast('Approved → invite ' + row.inviteCode);
+  loadWaitlist(); loadInvites();
+}
+async function rejectWaitlist(id) {
+  await api('/v1/admin/waitlist/' + id + '/reject', { method: 'POST', body: '{}' });
+  toast('Rejected');
+  loadWaitlist();
+}
+
+async function loadPayouts() {
+  const status = document.getElementById('payoutStatusFilter')?.value || 'REQUESTED';
+  const rows = await api('/v1/admin/payouts?status=' + encodeURIComponent(status));
+  document.getElementById('payoutBody').innerHTML = rows.map(r => `
+    <tr>
+      <td>${esc((r.createdAt || '').toString().slice(0, 19).replace('T', ' '))}</td>
+      <td>${esc(r.displayName || '—')}<br/><span class="muted">${esc(r.phone || r.userId.slice(0,8))}</span></td>
+      <td><strong>${esc(r.amountEtb)}</strong> ETB</td>
+      <td>${esc(r.destinationNote || '—')}</td>
+      <td>${esc(r.status)}</td>
+      <td class="row">
+        ${r.status === 'REQUESTED' ? `<button onclick="completePayout('${r.id}')">Mark paid</button>
+        <button class="danger" onclick="rejectPayout('${r.id}')">Reject</button>` : esc(r.adminNotes || '')}
+      </td>
+    </tr>`).join('') || '<tr><td colspan="6" class="muted">No payouts</td></tr>';
+}
+
+async function completePayout(id) {
+  const notes = prompt('Optional transfer note (reference / receipt)', 'Paid via CBE');
+  if (notes === null) return;
+  await api('/v1/admin/payouts/' + id + '/complete', { method: 'POST', body: JSON.stringify({ notes }) });
+  toast('Marked paid');
+  loadPayouts(); loadMetrics();
+}
+
+async function rejectPayout(id) {
+  const notes = prompt('Rejection reason', 'Unable to transfer — update destination');
+  if (notes === null) return;
+  await api('/v1/admin/payouts/' + id + '/reject', { method: 'POST', body: JSON.stringify({ notes }) });
+  toast('Rejected — balance restored');
+  loadPayouts(); loadMetrics();
+}
+
+async function loadMetrics() {
+  const data = await api('/v1/admin/metrics');
+  document.getElementById('metricsBody').textContent = JSON.stringify(data, null, 2);
+}
+async function loadReadiness() {
+  const data = await api('/v1/admin/ops/readiness');
+  document.getElementById('metricsBody').textContent = JSON.stringify(data, null, 2);
+}
+async function loadModeration() {
+  const [stats, events] = await Promise.all([
+    api('/v1/admin/moderation/stats'),
+    api('/v1/admin/moderation/events')
+  ]);
+  document.getElementById('moderationBody').textContent = JSON.stringify({ stats, events }, null, 2);
+}
+async function loadAudit() {
+  const action = document.getElementById('auditAction')?.value?.trim() || '';
+  const q = action ? ('?action=' + encodeURIComponent(action)) : '';
+  const rows = await api('/v1/admin/audit' + q);
+  document.getElementById('auditBody').innerHTML = rows.map(r => `
+    <tr>
+      <td>${esc((r.createdAt || '').toString().slice(0,19))}</td>
+      <td>${esc(r.action)}</td>
+      <td><code>${(r.actorUserId || '').toString().slice(0,8)}</code></td>
+      <td>${esc(r.entityType)}:${esc((r.entityId || '').toString().slice(0,8))}</td>
+      <td class="muted">${esc(JSON.stringify(r.metadata || {}))}</td>
+    </tr>`).join('') || '<tr><td colspan="5" class="muted">No audit rows</td></tr>';
+}
+async function loadShifts() {
+  const onCall = await api('/v1/admin/shifts/on-call');
+  document.getElementById('onCallBody').textContent = JSON.stringify(onCall, null, 2);
+  const rows = await api('/v1/admin/shifts');
+  document.getElementById('shiftBody').innerHTML = rows.map(r => `
+    <tr>
+      <td><code>${r.userId.slice(0,8)}</code></td>
+      <td>${esc(r.startsAt)} → ${esc(r.endsAt)}</td>
+      <td>${esc(r.roleLabel)}</td>
+      <td>${r.onCall ? 'yes' : 'no'}</td>
+      <td><button class="danger" onclick="deleteShift('${r.id}')">Delete</button></td>
+    </tr>`).join('') || '<tr><td colspan="5" class="muted">No shifts</td></tr>';
+}
+async function createShift() {
+  const body = {
+    userId: document.getElementById('shiftUser').value.trim(),
+    startsAt: document.getElementById('shiftStart').value.trim(),
+    endsAt: document.getElementById('shiftEnd').value.trim(),
+    roleLabel: document.getElementById('shiftRole').value.trim() || 'CONCIERGE',
+    onCall: true
+  };
+  await api('/v1/admin/shifts', { method: 'POST', body: JSON.stringify(body) });
+  toast('Shift created');
+  loadShifts();
+}
+async function deleteShift(id) {
+  await api('/v1/admin/shifts/' + id, { method: 'DELETE' });
+  toast('Deleted');
+  loadShifts();
+}
+async function loadConcierge() {
+  const tasks = await api('/v1/admin/concierge/tasks');
+  document.getElementById('conciergeTaskBody').innerHTML = tasks.map(t => `
+    <tr>
+      <td>${esc(t.taskType)}</td>
+      <td>${esc(t.dueAt)}</td>
+      <td>${esc(t.status)}${t.escalatedAt ? ' ⚠' : ''}</td>
+      <td class="muted">${esc(t.notes || '')}</td>
+      <td class="row">
+        <button class="secondary" onclick="ackTask('${t.id}')">Ack</button>
+        <button onclick="doneTask('${t.id}')">Done</button>
+      </td>
+    </tr>`).join('') || '<tr><td colspan="5" class="muted">No open tasks</td></tr>';
+  const meetings = await api('/v1/admin/concierge/meetings');
+  document.getElementById('conciergeMeetingBody').innerHTML = meetings.map(m => `
+    <tr>
+      <td>${esc(m.venueName || '')}</td>
+      <td>${esc(m.startsAt)}</td>
+      <td>${esc(m.status)}</td>
+      <td>${esc(m.checkedInAt || '—')}</td>
+      <td><code>${(m.connectionId || m.matchId || '').slice(0,8)}</code></td>
+    </tr>`).join('') || '<tr><td colspan="5" class="muted">No meetings in window</td></tr>';
+}
+async function ackTask(id) {
+  await api('/v1/admin/concierge/tasks/' + id + '/ack', { method: 'POST', body: '{}' });
+  toast('Acked');
+  loadConcierge();
+}
+async function doneTask(id) {
+  await api('/v1/admin/concierge/tasks/' + id + '/done', { method: 'POST', body: JSON.stringify({ notes: 'Completed' }) });
+  toast('Done');
+  loadConcierge();
+}
+async function assignPartner(venueId) {
+  const partnerUserId = prompt('Partner user UUID');
+  if (!partnerUserId) return;
+  await api('/v1/admin/venues/' + venueId + '/partner?partnerUserId=' + encodeURIComponent(partnerUserId), { method: 'POST', body: '{}' });
+  toast('Partner assigned');
+  loadAdminVenues();
+}
+async function assignSelectedPartner() {
+  toast('Use Assign partner on a venue row');
+}
+
+function useVenue(id) {
+  document.getElementById('venueId').value = id;
+  showTab('matches');
+  toast('Venue selected for connection');
+}
+
+if (token) {
+  showConsole(true);
+  openRoleWorkspace();
+  loadVerification().catch(() => { logout(); });
+  loadPhotoReview().catch(() => {});
+  loadMembers().catch(() => {});
+  loadPanics().catch(() => {});
+  loadReports().catch(() => {});
+  loadOutbox().catch(() => {});
+  loadHeld().catch(() => {});
+  loadInvites().catch(() => {});
+  loadAdminVenues().catch(() => {});
+  loadWaitlist().catch(() => {});
+  loadPayouts().catch(() => {});
+  loadMetrics().catch(() => {});
+  loadAudit().catch(() => {});
+  loadShifts().catch(() => {});
+  loadConcierge().catch(() => {});
+}
+</script>
+</body>
+</html>
