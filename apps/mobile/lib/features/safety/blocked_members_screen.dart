@@ -67,6 +67,7 @@ class BlockedMembersScreen extends ConsumerWidget {
             child: blocks.when(
               loading: () => const VelvetContentLoading(count: 2),
               error: (e, _) => VelvetEmptyState(
+                title: l10n.retry,
                 message: apiErrorMessage(e),
                 icon: Icons.block_outlined,
                 actionLabel: l10n.retry,
@@ -75,6 +76,7 @@ class BlockedMembersScreen extends ConsumerWidget {
               data: (items) {
                 if (items.isEmpty) {
                   return VelvetEmptyState(
+                    title: l10n.blockedMembers,
                     message: l10n.blockedEmpty,
                     icon: Icons.shield_outlined,
                   );

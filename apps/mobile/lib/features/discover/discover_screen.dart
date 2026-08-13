@@ -244,6 +244,7 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
     return matches.when(
       loading: () => const VelvetContentLoading(count: 2),
       error: (e, _) => VelvetEmptyState(
+        title: l10n.retry,
         message: apiErrorMessage(e),
         icon: Icons.handshake_outlined,
         actionLabel: l10n.retry,
@@ -256,6 +257,7 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
 
         if (open.isEmpty) {
           return VelvetEmptyState(
+            title: l10n.segmentIntros,
             message: l10n.introsEmpty,
             icon: Icons.handshake_outlined,
             actionLabel: l10n.introsEmptyCta,
@@ -330,6 +332,7 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
   Widget _listingsList(AppLocalizations l10n, String locale, bool isMan) {
     if (!isMan) {
       return VelvetEmptyState(
+        title: l10n.segmentListings,
         message: l10n.womenReceiveOnly,
         icon: Icons.inbox_outlined,
         actionLabel: l10n.segmentRequests,
@@ -347,6 +350,7 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
             apiErrorMessage(e).toLowerCase().contains('subscription');
         if (isSub) {
           return VelvetEmptyState(
+            title: l10n.navMembership,
             message: l10n.membershipRequiredBrowse,
             icon: Icons.workspace_premium_outlined,
             actionLabel: l10n.navMembership,
@@ -354,6 +358,7 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
           );
         }
         return VelvetEmptyState(
+          title: l10n.retry,
           message: apiErrorMessage(e),
           icon: Icons.storefront_outlined,
           actionLabel: l10n.retry,
@@ -363,6 +368,7 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
       data: (feedData) {
         if (feedData.mode == 'GENDER_REQUIRED') {
           return VelvetEmptyState(
+            title: l10n.profile,
             message: l10n.genderRequiredHint,
             icon: Icons.person_outline_rounded,
             actionLabel: l10n.profile,
@@ -371,6 +377,7 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
         }
         if (feedData.items.isEmpty) {
           return VelvetEmptyState(
+            title: l10n.segmentListings,
             message: l10n.discoverEmpty,
             icon: Icons.storefront_outlined,
             flowSteps: _clientBrowseFlow(l10n),
@@ -459,6 +466,7 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
     return feed.when(
       loading: () => const VelvetContentLoading(count: 2),
       error: (e, _) => VelvetEmptyState(
+        title: l10n.retry,
         message: apiErrorMessage(e),
         icon: Icons.inbox_outlined,
         actionLabel: l10n.retry,
@@ -467,6 +475,7 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
       data: (feedData) {
         if (feedData.items.isEmpty) {
           return VelvetEmptyState(
+            title: l10n.segmentRequests,
             message: l10n.clientRequestsEmpty,
             icon: Icons.inbox_outlined,
             flowSteps: [

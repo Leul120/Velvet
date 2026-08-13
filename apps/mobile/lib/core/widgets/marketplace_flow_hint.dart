@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:velvet_mobile/core/theme/velvet_theme.dart';
+import 'package:velvet_mobile/core/theme/velvet_editorial_colors.dart';
+import 'package:velvet_mobile/core/theme/velvet_tokens.dart';
 
 class MarketplaceFlowStep {
   const MarketplaceFlowStep({required this.icon, required this.label});
@@ -16,50 +17,58 @@ class MarketplaceFlowHint extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Wrap(
-      alignment: WrapAlignment.center,
-      spacing: 8,
-      runSpacing: 8,
+    final colors = context.velvet;
+    return Column(
       children: [
         for (var i = 0; i < steps.length; i++) ...[
-          _FlowChip(step: steps[i]),
+          Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: VelvetTokens.ember.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(steps[i].icon, size: 18, color: VelvetTokens.ember),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  steps[i].label,
+                  style: GoogleFonts.dmSans(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    color: colors.ink,
+                  ),
+                ),
+              ),
+              Text(
+                '${i + 1}',
+                style: GoogleFonts.syne(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: colors.muted,
+                ),
+              ),
+            ],
+          ),
           if (i < steps.length - 1)
-            Icon(Icons.arrow_forward_rounded, size: 14, color: VelvetTheme.muted.withValues(alpha: 0.7)),
+            Padding(
+              padding: const EdgeInsets.only(left: 17),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Container(
+                  width: 2,
+                  height: 14,
+                  margin: const EdgeInsets.symmetric(vertical: 4),
+                  color: colors.line.withValues(alpha: 0.8),
+                ),
+              ),
+            ),
         ],
       ],
-    );
-  }
-}
-
-class _FlowChip extends StatelessWidget {
-  const _FlowChip({required this.step});
-
-  final MarketplaceFlowStep step;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: VelvetTheme.teal.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: VelvetTheme.teal.withValues(alpha: 0.28)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(step.icon, size: 14, color: VelvetTheme.champagne),
-          const SizedBox(width: 6),
-          Text(
-            step.label,
-            style: GoogleFonts.inter(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: VelvetTheme.champagne,
-            ),
-          ),
-        ],
-      ),
     );
   }
 }
@@ -78,33 +87,46 @@ class DiscoverCoachBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-      child: GlassPanel(
-        padding: const EdgeInsets.fromLTRB(14, 12, 8, 12),
-        fill: VelvetTheme.glassStrong,
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Icon(Icons.route_outlined, color: VelvetTheme.orangeSoft, size: 20),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(title, style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
-                  const SizedBox(height: 4),
-                  Text(body, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: VelvetTheme.muted)),
-                ],
-              ),
+    final colors = context.velvet;
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 12, 4, 12),
+      decoration: BoxDecoration(
+        color: colors.parchmentLift,
+        borderRadius: BorderRadius.circular(VelvetTokens.radiusMd),
+        border: Border.all(color: VelvetTokens.ember.withValues(alpha: 0.28)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.route_outlined, color: VelvetTokens.ember, size: 20),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  body,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: colors.muted,
+                        height: 1.4,
+                      ),
+                ),
+              ],
             ),
-            IconButton(
-              visualDensity: VisualDensity.compact,
-              onPressed: onDismiss,
-              icon: const Icon(Icons.close_rounded, size: 18),
-            ),
-          ],
-        ),
+          ),
+          IconButton(
+            onPressed: onDismiss,
+            icon: const Icon(Icons.close_rounded, size: 18),
+            visualDensity: VisualDensity.compact,
+          ),
+        ],
       ),
     );
   }

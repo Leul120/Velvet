@@ -105,6 +105,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
             child: items.when(
               loading: () => const VelvetContentLoading(),
               error: (e, _) => VelvetEmptyState(
+                title: l10n.notificationsTitle,
                 message: apiErrorMessage(e),
                 icon: Icons.notifications_off_outlined,
                 actionLabel: l10n.retry,
@@ -112,13 +113,10 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
               ),
               data: (list) {
                 if (list.isEmpty) {
-                  return Center(
-                    child: Text(
-                      l10n.notificationsEmpty,
-                      style: Theme.of(
-                        context,
-                      ).textTheme.bodyLarge?.copyWith(color: context.velvet.muted),
-                    ),
+                  return VelvetEmptyState(
+                    title: l10n.notificationsTitle,
+                    message: l10n.notificationsEmpty,
+                    icon: Icons.notifications_none_rounded,
                   );
                 }
                 return RefreshIndicator(

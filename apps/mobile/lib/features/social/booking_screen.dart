@@ -843,6 +843,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
                   ? const VelvetContentLoading(count: 4)
                   : _error != null
                   ? VelvetEmptyState(
+                      title: l10n.retry,
                       message: _error!,
                       icon: Icons.event_busy_outlined,
                       actionLabel: l10n.retry,

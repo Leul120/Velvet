@@ -3,12 +3,11 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:velvet_mobile/core/network/dio_client.dart';
 import 'package:velvet_mobile/core/config/api_config.dart';
-import 'package:velvet_mobile/core/theme/velvet_theme.dart';
+import 'package:velvet_mobile/core/network/dio_client.dart';
 import 'package:velvet_mobile/core/theme/velvet_editorial_colors.dart';
+import 'package:velvet_mobile/core/theme/velvet_theme.dart';
 import 'package:velvet_mobile/core/theme/velvet_tokens.dart';
-import 'package:velvet_mobile/core/widgets/kinetic_text.dart';
 import 'package:velvet_mobile/core/widgets/velvet_widgets.dart';
 import 'package:velvet_mobile/features/auth/auth_controller.dart';
 import 'package:velvet_mobile/l10n/generated/app_localizations.dart';
@@ -48,87 +47,138 @@ class _LegalAcceptScreenState extends ConsumerState<LegalAcceptScreen> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    final colors = context.velvet;
     final locale = Localizations.localeOf(context).languageCode;
-    final terms = locale == 'am' ? '/legal/terms-am.html' : '/legal/terms-en.html';
-    final privacy = locale == 'am' ? '/legal/privacy-am.html' : '/legal/privacy-en.html';
-    final community = locale == 'am' ? '/legal/community-am.html' : '/legal/community-en.html';
+    final terms =
+        locale == 'am' ? '/legal/terms-am.html' : '/legal/terms-en.html';
+    final privacy =
+        locale == 'am' ? '/legal/privacy-am.html' : '/legal/privacy-en.html';
+    final community = locale == 'am'
+        ? '/legal/community-am.html'
+        : '/legal/community-en.html';
 
     Widget link(String label, String path, int delayMs) {
       return Padding(
-        padding: const EdgeInsets.only(bottom: 12),
-        child: GlassPanel(
-          fill: VelvetTheme.glassStrong,
-          padding: EdgeInsets.zero,
+        padding: const EdgeInsets.only(bottom: 10),
+        child: Material(
+          color: Colors.transparent,
           child: InkWell(
             onTap: () => _open(path),
-            borderRadius: BorderRadius.circular(VelvetTheme.radiusXl),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
+            borderRadius: BorderRadius.circular(16),
+            child: Ink(
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+              decoration: BoxDecoration(
+                color: colors.parchmentLift,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: colors.line.withValues(alpha: 0.7)),
+              ),
               child: Row(
                 children: [
                   Expanded(
                     child: Text(
                       label,
-                      style: GoogleFonts.inter(fontWeight: FontWeight.w500, fontSize: 15),
+                      style: GoogleFonts.dmSans(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 15,
+                        color: colors.ink,
+                      ),
                     ),
                   ),
-                  const Icon(Icons.open_in_new, size: 16, color: VelvetTheme.teal),
+                  Icon(
+                    Icons.open_in_new_rounded,
+                    size: 16,
+                    color: VelvetTokens.ember,
+                  ),
                 ],
               ),
             ),
           ),
-        ).animate().fadeIn(delay: delayMs.ms, duration: 320.ms).slideY(begin: 0.05, end: 0),
+        )
+            .animate()
+            .fadeIn(delay: delayMs.ms, duration: 320.ms)
+            .slideY(begin: 0.04, end: 0),
       );
     }
 
     return VelvetAuthScaffold(
       body: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(28, 36, 28, 28),
+          padding: const EdgeInsets.fromLTRB(24, 28, 24, 28),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const VelvetWordmark(size: 36),
-              const SizedBox(height: VelvetTokens.space32),
-              KineticEyebrow(label: l10n.legalUpdateTitle, icon: Icons.gavel_outlined),
-              const SizedBox(height: VelvetTokens.space8),
-              KineticText(
-                text: l10n.legalUpdateTitle,
+              const VelvetWordmark(size: 36, breathe: true),
+              const SizedBox(height: 28),
+              Text(
+                l10n.legalUpdateTitle,
                 style: GoogleFonts.syne(
-                  fontSize: VelvetTokens.displayMedium,
+                  fontSize: 32,
                   fontWeight: FontWeight.w800,
-                  letterSpacing: -1.0,
-                  height: 0.95,
-                  color: context.velvet.ink,
+                  letterSpacing: -0.9,
+                  height: 0.98,
+                  color: colors.ink,
                 ),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 10),
               Text(
                 l10n.legalUpdateBody,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: context.velvet.muted,
+                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                      color: colors.muted,
                       height: 1.45,
                     ),
-              ).animate().fadeIn(delay: 50.ms, duration: 400.ms),
-              const SizedBox(height: 36),
-              link(l10n.termsOfService, terms, 100),
-              link(l10n.privacyPolicy, privacy, 150),
-              link(l10n.communityGuidelines, community, 200),
-              const SizedBox(height: 12),
+              ).animate().fadeIn(delay: 40.ms, duration: 360.ms),
+              const SizedBox(height: 28),
+              link(l10n.termsOfService, terms, 80),
+              link(l10n.privacyPolicy, privacy, 120),
+              link(l10n.communityGuidelines, community, 160),
+              const SizedBox(height: 8),
               Text(
                 l10n.legalMarketplaceNotice,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(color: context.velvet.muted),
-              ).animate().fadeIn(delay: 250.ms),
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: colors.muted,
+                      height: 1.4,
+                    ),
+              ).animate().fadeIn(delay: 200.ms),
               if (_error != null) ...[
                 const SizedBox(height: 16),
-                Text(_error!, style: const TextStyle(color: VelvetTheme.danger)),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: VelvetTheme.danger.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: VelvetTheme.danger.withValues(alpha: 0.35),
+                    ),
+                  ),
+                  child: Text(
+                    _error!,
+                    style: const TextStyle(
+                      color: VelvetTheme.danger,
+                      height: 1.35,
+                    ),
+                  ),
+                ),
               ],
               const Spacer(),
-              VelvetButton(
-                label: l10n.legalAcceptCta,
-                loading: _loading,
+              FilledButton(
                 onPressed: _loading ? null : _accept,
-              ).animate().fadeIn(delay: 300.ms),
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size.fromHeight(54),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                ),
+                child: _loading
+                    ? const SizedBox(
+                        width: 22,
+                        height: 22,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: VelvetTokens.onPrimary,
+                        ),
+                      )
+                    : Text(l10n.legalAcceptCta),
+              ).animate().fadeIn(delay: 240.ms),
             ],
           ),
         ),

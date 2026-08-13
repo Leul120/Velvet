@@ -5,10 +5,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:velvet_mobile/core/network/dio_client.dart';
-import 'package:velvet_mobile/core/theme/velvet_theme.dart';
 import 'package:velvet_mobile/core/theme/velvet_editorial_colors.dart';
+import 'package:velvet_mobile/core/theme/velvet_theme.dart';
 import 'package:velvet_mobile/core/theme/velvet_tokens.dart';
-import 'package:velvet_mobile/core/widgets/kinetic_text.dart';
 import 'package:velvet_mobile/core/widgets/velvet_widgets.dart';
 import 'package:velvet_mobile/l10n/generated/app_localizations.dart';
 
@@ -53,9 +52,8 @@ class _WaitlistScreenState extends ConsumerState<WaitlistScreen> {
         '/v1/waitlist',
         data: {
           'phoneE164': _phoneCtrl.text.trim(),
-          'displayName': _nameCtrl.text.trim().isEmpty
-              ? null
-              : _nameCtrl.text.trim(),
+          'displayName':
+              _nameCtrl.text.trim().isEmpty ? null : _nameCtrl.text.trim(),
           'city': _cityCtrl.text.trim().isEmpty
               ? 'Addis Ababa'
               : _cityCtrl.text.trim(),
@@ -117,227 +115,279 @@ class _WaitlistScreenState extends ConsumerState<WaitlistScreen> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    final colors = context.velvet;
+
     return VelvetAuthScaffold(
       body: LayoutBuilder(
-        builder: (context, constraints) => SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(24, 12, 24, 48),
-          child: ConstrainedBox(
-            constraints: BoxConstraints(
-              minHeight: constraints.maxHeight - 60,
-            ),
-            child: IntrinsicHeight(
+        builder: (context, constraints) {
+          final minHeight = constraints.hasBoundedHeight
+              ? (constraints.maxHeight - 24).clamp(0.0, double.infinity)
+              : 0.0;
+          return SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(24, 8, 24, 32),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minHeight: minHeight),
               child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Align(
                     alignment: Alignment.centerLeft,
-                    child: VelvetIconChip(
-                      icon: Icons.arrow_back_ios_new_rounded,
-                      onTap: () => Navigator.of(context).maybePop(),
+                    child: IconButton(
+                      onPressed: () => Navigator.of(context).maybePop(),
+                      icon: const Icon(
+                        Icons.arrow_back_ios_new_rounded,
+                        size: 18,
+                      ),
                     ),
                   ),
-                  const SizedBox(height: VelvetTokens.space16),
-                  KineticEyebrow(
-                    label: l10n.waitlistTitle,
-                    icon: Icons.hourglass_top_outlined,
-                  ),
-                  const SizedBox(height: VelvetTokens.space8),
-                  KineticText(
-                    text: l10n.waitlistTitle,
+                  const SizedBox(height: 12),
+                  Text(
+                    l10n.waitlistTitle,
                     style: GoogleFonts.syne(
-                      fontSize: VelvetTokens.displayMedium,
+                      fontSize: 34,
                       fontWeight: FontWeight.w800,
-                      letterSpacing: -1.2,
-                      height: 0.95,
-                      color: context.velvet.ink,
+                      letterSpacing: -1.0,
+                      height: 0.98,
+                      color: colors.ink,
                     ),
                   ),
-                  const SizedBox(height: VelvetTokens.space24),
-                  GlassPanel(
-                    radius: VelvetTheme.radiusLg,
-                    padding: const EdgeInsets.all(28),
-                    child: _submitted
-                              ? Column(
-                                  crossAxisAlignment: CrossAxisAlignment.center,
-                                  children: [
-                                    const Icon(
-                                      Icons.check_circle_outline,
-                                      size: 64,
-                                      color: VelvetTheme.teal,
-                                    ),
-                                    const SizedBox(height: 16),
-                                    Text(
-                                      l10n.waitlistThanks,
-                                      textAlign: TextAlign.center,
-                                      style: Theme.of(
-                                        context,
-                                      ).textTheme.headlineSmall,
-                                    ).animate().fadeIn().slideY(
-                                      begin: 0.1,
-                                      end: 0,
-                                    ),
-                                    const SizedBox(height: 12),
-                                    Text(
-                                      _status == 'APPROVED'
-                                          ? l10n.waitlistStatusApproved
-                                          : l10n.waitlistStatusPending,
-                                      textAlign: TextAlign.center,
-                                      style: Theme.of(context)
-                                          .textTheme
-                                          .bodyLarge
-                                          ?.copyWith(color: context.velvet.muted),
-                                    ),
-                                    if (_inviteCode != null &&
-                                        _inviteCode!.isNotEmpty) ...[
-                                      const SizedBox(height: 16),
-                                      SelectableText(
-                                        _inviteCode!,
-                                        style: GoogleFonts.inter(
-                                          fontSize: 32,
-                                          fontWeight: FontWeight.w700,
-                                          color: VelvetTheme.teal,
-                                        ),
-                                      ),
-                                    ],
-                                    const SizedBox(height: 16),
-                                    Text(
-                                      l10n.waitlistFriendsApproved(
-                                        _friendsApproved,
-                                      ),
-                                      textAlign: TextAlign.center,
-                                      style: Theme.of(context)
-                                          .textTheme
-                                          .bodyMedium
-                                          ?.copyWith(
-                                            color: VelvetTheme.tealDeep,
-                                          ),
-                                    ),
-                                    const SizedBox(height: 32),
-                                    VelvetButton(
-                                      label: l10n.shareInviteWhatsApp,
-                                      icon: Icons.chat_outlined,
-                                      onPressed: _shareWhatsApp,
-                                    ),
-                                    const SizedBox(height: 10),
-                                    VelvetButton(
-                                      label: l10n.waitlistCheckStatus,
-                                      variant: VelvetButtonVariant.ghost,
-                                      loading: _loading,
-                                      onPressed: _loading ? null : _checkStatus,
-                                    ),
-                                  ],
-                                )
-                              : Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      l10n.waitlistHint,
-                                      style: Theme.of(context)
-                                          .textTheme
-                                          .bodyMedium
-                                          ?.copyWith(
-                                            color: context.velvet.muted,
-                                            height: 1.4,
-                                          ),
-                                    ),
-                                    const SizedBox(height: 16),
-                                    Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            VelvetField(
-                                              controller: _phoneCtrl,
-                                              label: l10n.phoneNumber,
-                                              hint: l10n.phoneHint,
-                                              keyboardType: TextInputType.phone,
-                                              prefixIcon: const Icon(
-                                                Icons.phone_outlined,
-                                              ),
-                                              autofillHints: const [
-                                                AutofillHints.telephoneNumber,
-                                              ],
-                                              textInputAction:
-                                                  TextInputAction.next,
-                                            ),
-                                            const SizedBox(height: 16),
-                                            VelvetField(
-                                              controller: _nameCtrl,
-                                              label: l10n.displayName,
-                                              prefixIcon: const Icon(
-                                                Icons.person_outline,
-                                              ),
-                                              textCapitalization:
-                                                  TextCapitalization.words,
-                                              autofillHints: const [
-                                                AutofillHints.name,
-                                              ],
-                                              textInputAction:
-                                                  TextInputAction.next,
-                                            ),
-                                            const SizedBox(height: 16),
-                                            VelvetField(
-                                              controller: _cityCtrl,
-                                              label: l10n.waitlistCity,
-                                              prefixIcon: const Icon(
-                                                Icons.location_city_outlined,
-                                              ),
-                                              textCapitalization:
-                                                  TextCapitalization.words,
-                                              autofillHints: const [
-                                                AutofillHints.addressCity,
-                                              ],
-                                              textInputAction:
-                                                  TextInputAction.next,
-                                            ),
-                                            const SizedBox(height: 16),
-                                            VelvetField(
-                                              controller: _noteCtrl,
-                                              label: l10n.waitlistNote,
-                                              prefixIcon: const Icon(
-                                                Icons.edit_note_outlined,
-                                              ),
-                                              maxLines: 3,
-                                              textInputAction:
-                                                  TextInputAction.done,
-                                              onSubmitted: (_) =>
-                                                  _loading ? null : _submit(),
-                                            ),
-                                            if (_error != null) ...[
-                                              const SizedBox(height: 16),
-                                              Text(
-                                                _error!,
-                                                style: const TextStyle(
-                                                  color: VelvetTheme.danger,
-                                                ),
-                                              ),
-                                            ],
-                                          ],
-                                        )
-                                        .animate()
-                                        .fadeIn(duration: 400.ms)
-                                        .slideY(begin: 0.05, end: 0),
-                                    const SizedBox(height: 24),
-                                    VelvetButton(
-                                      label: l10n.waitlistSubmit,
-                                      loading: _loading,
-                                      onPressed: _loading ? null : _submit,
-                                    ),
-                                    const SizedBox(height: 12),
-                                    VelvetButton(
-                                      label: l10n.waitlistCheckStatus,
-                                      variant: VelvetButtonVariant.secondary,
-                                      loading: _loading,
-                                      onPressed: _loading ? null : _checkStatus,
-                                    ),
-                                  ],
-                                ),
+                  const SizedBox(height: 10),
+                  Text(
+                    l10n.waitlistHint,
+                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                          color: colors.muted,
+                          height: 1.45,
+                        ),
                   ),
+                  const SizedBox(height: 28),
+                  Container(
+                    padding: const EdgeInsets.fromLTRB(20, 24, 20, 24),
+                    decoration: BoxDecoration(
+                      color: colors.parchmentLift,
+                      borderRadius:
+                          BorderRadius.circular(VelvetTokens.radiusLg),
+                      border: Border.all(
+                        color: colors.line.withValues(alpha: 0.7),
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.35),
+                          blurRadius: 28,
+                          offset: const Offset(0, 12),
+                        ),
+                      ],
+                    ),
+                    child: _submitted
+                        ? Column(
+                            children: [
+                              Container(
+                                width: 64,
+                                height: 64,
+                                alignment: Alignment.center,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: VelvetTokens.ember
+                                      .withValues(alpha: 0.14),
+                                  border: Border.all(
+                                    color: VelvetTokens.ember
+                                        .withValues(alpha: 0.3),
+                                  ),
+                                ),
+                                child: const Icon(
+                                  Icons.check_rounded,
+                                  size: 30,
+                                  color: VelvetTokens.ember,
+                                ),
+                              ),
+                              const SizedBox(height: 18),
+                              Text(
+                                l10n.waitlistThanks,
+                                textAlign: TextAlign.center,
+                                style: GoogleFonts.syne(
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: -0.4,
+                                ),
+                              ),
+                              const SizedBox(height: 10),
+                              Text(
+                                _status == 'APPROVED'
+                                    ? l10n.waitlistStatusApproved
+                                    : l10n.waitlistStatusPending,
+                                textAlign: TextAlign.center,
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .bodyLarge
+                                    ?.copyWith(
+                                      color: colors.muted,
+                                      height: 1.4,
+                                    ),
+                              ),
+                              if (_inviteCode != null &&
+                                  _inviteCode!.isNotEmpty) ...[
+                                const SizedBox(height: 18),
+                                SelectableText(
+                                  _inviteCode!,
+                                  style: GoogleFonts.syne(
+                                    fontSize: 28,
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: -0.6,
+                                    color: VelvetTokens.ember,
+                                  ),
+                                ),
+                              ],
+                              const SizedBox(height: 14),
+                              Text(
+                                l10n.waitlistFriendsApproved(_friendsApproved),
+                                textAlign: TextAlign.center,
+                                style: GoogleFonts.dmSans(
+                                  color: VelvetTokens.emberDeep,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              const SizedBox(height: 28),
+                              FilledButton.icon(
+                                onPressed: _shareWhatsApp,
+                                style: FilledButton.styleFrom(
+                                  minimumSize: const Size.fromHeight(54),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(999),
+                                  ),
+                                ),
+                                icon: const Icon(Icons.chat_outlined, size: 18),
+                                label: Text(l10n.shareInviteWhatsApp),
+                              ),
+                              const SizedBox(height: 10),
+                              OutlinedButton(
+                                onPressed: _loading ? null : _checkStatus,
+                                style: OutlinedButton.styleFrom(
+                                  minimumSize: const Size.fromHeight(48),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(999),
+                                  ),
+                                ),
+                                child: _loading
+                                    ? const SizedBox(
+                                        width: 20,
+                                        height: 20,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                        ),
+                                      )
+                                    : Text(l10n.waitlistCheckStatus),
+                              ),
+                            ],
+                          )
+                        : Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              VelvetField(
+                                controller: _phoneCtrl,
+                                label: l10n.phoneNumber,
+                                hint: l10n.phoneHint,
+                                keyboardType: TextInputType.phone,
+                                prefixIcon: const Icon(Icons.phone_outlined),
+                                autofillHints: const [
+                                  AutofillHints.telephoneNumber,
+                                ],
+                                textInputAction: TextInputAction.next,
+                              ),
+                              const SizedBox(height: 14),
+                              VelvetField(
+                                controller: _nameCtrl,
+                                label: l10n.displayName,
+                                prefixIcon: const Icon(Icons.person_outline),
+                                textCapitalization: TextCapitalization.words,
+                                autofillHints: const [AutofillHints.name],
+                                textInputAction: TextInputAction.next,
+                              ),
+                              const SizedBox(height: 14),
+                              VelvetField(
+                                controller: _cityCtrl,
+                                label: l10n.waitlistCity,
+                                prefixIcon:
+                                    const Icon(Icons.location_city_outlined),
+                                textCapitalization: TextCapitalization.words,
+                                autofillHints: const [
+                                  AutofillHints.addressCity,
+                                ],
+                                textInputAction: TextInputAction.next,
+                              ),
+                              const SizedBox(height: 14),
+                              VelvetField(
+                                controller: _noteCtrl,
+                                label: l10n.waitlistNote,
+                                prefixIcon:
+                                    const Icon(Icons.edit_note_outlined),
+                                maxLines: 3,
+                                textInputAction: TextInputAction.done,
+                                onSubmitted: (_) =>
+                                    _loading ? null : _submit(),
+                              ),
+                              if (_error != null) ...[
+                                const SizedBox(height: 14),
+                                Container(
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    color: VelvetTheme.danger
+                                        .withValues(alpha: 0.12),
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                      color: VelvetTheme.danger
+                                          .withValues(alpha: 0.35),
+                                    ),
+                                  ),
+                                  child: Text(
+                                    _error!,
+                                    style: const TextStyle(
+                                      color: VelvetTheme.danger,
+                                      height: 1.35,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                              const SizedBox(height: 22),
+                              FilledButton(
+                                onPressed: _loading ? null : _submit,
+                                style: FilledButton.styleFrom(
+                                  minimumSize: const Size.fromHeight(54),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(999),
+                                  ),
+                                ),
+                                child: _loading
+                                    ? const SizedBox(
+                                        width: 22,
+                                        height: 22,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          color: VelvetTokens.onPrimary,
+                                        ),
+                                      )
+                                    : Text(l10n.waitlistSubmit),
+                              ),
+                              const SizedBox(height: 10),
+                              OutlinedButton(
+                                onPressed: _loading ? null : _checkStatus,
+                                style: OutlinedButton.styleFrom(
+                                  minimumSize: const Size.fromHeight(48),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(999),
+                                  ),
+                                ),
+                                child: Text(l10n.waitlistCheckStatus),
+                              ),
+                            ],
+                          ),
+                  )
+                      .animate()
+                      .fadeIn(delay: 60.ms, duration: 400.ms)
+                      .slideY(begin: 0.04, end: 0),
                 ],
               ),
             ),
-          ),
-        ),
+          );
+        },
       ),
     );
   }

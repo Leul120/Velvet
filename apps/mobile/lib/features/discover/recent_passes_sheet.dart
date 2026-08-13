@@ -68,6 +68,7 @@ Future<void> showRecentPassesSheet(BuildContext context, WidgetRef ref) async {
                 data: (feed) {
                   if (feed.items.isEmpty) {
                     return VelvetEmptyState(
+                      title: l10n.recentPassesTitle,
                       message: l10n.recentPassesEmpty,
                       icon: Icons.history_rounded,
                     );

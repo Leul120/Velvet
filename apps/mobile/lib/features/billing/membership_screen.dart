@@ -304,6 +304,7 @@ class _MembershipScreenState extends ConsumerState<MembershipScreen> {
                 ? const VelvetContentLoading()
                 : _error != null
                 ? VelvetEmptyState(
+                    title: l10n.navMembership,
                     message: _error!,
                     icon: Icons.workspace_premium_outlined,
                     actionLabel: l10n.retry,

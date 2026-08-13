@@ -910,58 +910,60 @@ class VelvetContentLoading extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.velvet;
     return Semantics(
       label: 'Loading content',
       child: ListView.separated(
         physics: const NeverScrollableScrollPhysics(),
         padding: const EdgeInsets.fromLTRB(20, 26, 20, 20),
         itemCount: count,
-        separatorBuilder: (_, _) => const SizedBox(height: 16),
+        separatorBuilder: (_, _) => const SizedBox(height: 14),
         itemBuilder: (context, index) =>
-            GlassPanel(
-                  padding: const EdgeInsets.all(18),
-                  fill: VelvetTheme.glassFill,
-                  lift: false,
+            Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: colors.parchmentLift,
+                    borderRadius: BorderRadius.circular(VelvetTokens.radiusMd),
+                    border: Border.all(color: colors.line.withValues(alpha: 0.6)),
+                  ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Container(
-                        width: index == 0 ? 148 : 112,
-                        height: 15,
+                        width: index.isEven ? 148 : 112,
+                        height: 14,
                         decoration: BoxDecoration(
-                          color: VelvetTheme.line.withValues(alpha: 0.58),
+                          color: colors.line.withValues(alpha: 0.7),
                           borderRadius: BorderRadius.circular(8),
                         ),
                       ),
                       const SizedBox(height: 14),
                       Container(
                         width: double.infinity,
-                        height: 11,
+                        height: 10,
                         decoration: BoxDecoration(
-                          color: VelvetTheme.line.withValues(alpha: 0.35),
+                          color: colors.line.withValues(alpha: 0.45),
                           borderRadius: BorderRadius.circular(8),
                         ),
                       ),
                       const SizedBox(height: 8),
                       Container(
                         width: 180,
-                        height: 11,
+                        height: 10,
                         decoration: BoxDecoration(
-                          color: VelvetTheme.line.withValues(alpha: 0.3),
+                          color: colors.line.withValues(alpha: 0.35),
                           borderRadius: BorderRadius.circular(8),
                         ),
                       ),
                     ],
                   ),
                 )
-                .animate(
-                  onPlay: (controller) => controller.repeat(),
-                )
+                .animate(onPlay: (controller) => controller.repeat())
                 .shimmer(
-                  duration: 1500.ms,
-                  color: VelvetTheme.champagne.withValues(alpha: 0.15),
+                  duration: 1400.ms,
+                  color: VelvetTokens.ember.withValues(alpha: 0.12),
                 )
-                .fadeIn(duration: 300.ms),
+                .fadeIn(duration: 280.ms),
       ),
     );
   }
@@ -1010,11 +1012,12 @@ class VelvetVerifiedBadge extends StatelessWidget {
   }
 }
 
-/// Editorial asymmetric empty state with layered depth.
+/// Centered empty / error state — works on every feed and list.
 class VelvetEmptyState extends StatelessWidget {
   const VelvetEmptyState({
     super.key,
     required this.message,
+    this.title,
     this.icon = Icons.storefront_outlined,
     this.flowSteps,
     this.actionLabel,
@@ -1024,6 +1027,7 @@ class VelvetEmptyState extends StatelessWidget {
   });
 
   final String message;
+  final String? title;
   final IconData icon;
   final List<MarketplaceFlowStep>? flowSteps;
   final String? actionLabel;
@@ -1033,88 +1037,98 @@ class VelvetEmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.velvet;
+
     return Semantics(
       liveRegion: true,
       child: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(
-            horizontal: VelvetTokens.pageInset,
-            vertical: VelvetTokens.space32,
+            horizontal: VelvetTokens.pageInset + 8,
+            vertical: VelvetTokens.space40,
           ),
-          child: Stack(
-            clipBehavior: Clip.none,
-            children: [
-              Positioned(
-                top: -12,
-                right: -8,
-                child: Container(
-                  width: 88,
-                  height: 88,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 360),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 72,
+                  height: 72,
+                  alignment: Alignment.center,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: VelvetTokens.emberSoft.withValues(alpha: 0.35),
+                    color: VelvetTokens.ember.withValues(alpha: 0.12),
+                    border: Border.all(
+                      color: VelvetTokens.ember.withValues(alpha: 0.28),
+                    ),
                   ),
+                  child: Icon(icon, size: 32, color: VelvetTokens.ember),
                 ),
-              ),
-              GlassPanel(
-                padding: const EdgeInsets.fromLTRB(28, 36, 24, 32),
-                radius: VelvetTokens.radiusXl,
-                fill: VelvetTokens.glassStrong.withValues(alpha: 0.88),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Transform.rotate(
-                      angle: -0.04,
-                      child: Container(
-                        width: 64,
-                        height: 64,
-                        decoration: BoxDecoration(
-                          color: VelvetTokens.parchmentDeep,
-                          borderRadius: BorderRadius.only(
-                            topLeft: Radius.circular(VelvetTokens.radiusMd),
-                            topRight: Radius.circular(VelvetTokens.radiusSm),
-                            bottomLeft: Radius.circular(VelvetTokens.radiusSm),
-                            bottomRight: Radius.circular(VelvetTokens.radiusLg),
-                          ),
-                          boxShadow: VelvetTokens.depthLift(elevation: 0.4),
+                const SizedBox(height: VelvetTokens.space24),
+                if (title != null) ...[
+                  Text(
+                    title!,
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.syne(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: -0.5,
+                      color: colors.ink,
+                    ),
+                  ),
+                  const SizedBox(height: VelvetTokens.space10),
+                ],
+                Text(
+                  message,
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                        color: colors.muted,
+                        height: 1.5,
+                      ),
+                ),
+                if (flowSteps != null && flowSteps!.isNotEmpty) ...[
+                  const SizedBox(height: VelvetTokens.space24),
+                  MarketplaceFlowHint(steps: flowSteps!),
+                ],
+                if (actionLabel != null && onAction != null) ...[
+                  const SizedBox(height: VelvetTokens.space24),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton(
+                      onPressed: onAction,
+                      style: FilledButton.styleFrom(
+                        minimumSize: const Size.fromHeight(52),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(999),
                         ),
-                        child: Icon(icon, size: 30, color: VelvetTokens.ember),
                       ),
+                      child: Text(actionLabel!),
                     ),
-                    const SizedBox(height: VelvetTokens.space24),
-                    Text(
-                      message,
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        height: 1.45,
-                        color: context.velvet.ink,
-                        fontWeight: FontWeight.w600,
+                  ),
+                ],
+                if (secondaryLabel != null && onSecondary != null) ...[
+                  const SizedBox(height: VelvetTokens.space10),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton(
+                      onPressed: onSecondary,
+                      style: OutlinedButton.styleFrom(
+                        minimumSize: const Size.fromHeight(48),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(999),
+                        ),
                       ),
+                      child: Text(secondaryLabel!),
                     ),
-                    if (flowSteps != null && flowSteps!.isNotEmpty) ...[
-                      const SizedBox(height: VelvetTokens.space16),
-                      MarketplaceFlowHint(steps: flowSteps!),
-                    ],
-                    if (actionLabel != null && onAction != null) ...[
-                      const SizedBox(height: VelvetTokens.space24),
-                      VelvetButton(label: actionLabel!, onPressed: onAction),
-                    ],
-                    if (secondaryLabel != null && onSecondary != null) ...[
-                      const SizedBox(height: VelvetTokens.space12),
-                      VelvetButton(
-                        label: secondaryLabel!,
-                        variant: VelvetButtonVariant.secondary,
-                        onPressed: onSecondary,
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-            ],
+                  ),
+                ],
+              ],
+            ),
           ),
         ),
       ),
-    ).animate().fadeIn(duration: VelvetTokens.motionMedium).slideY(begin: 0.05, end: 0);
+    ).animate().fadeIn(duration: 280.ms).slideY(begin: 0.04, end: 0);
   }
 }
 

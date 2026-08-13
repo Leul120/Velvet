@@ -65,6 +65,7 @@ class ConnectionHistoryScreen extends ConsumerWidget {
             child: history.when(
               loading: () => const VelvetContentLoading(count: 2),
               error: (e, _) => VelvetEmptyState(
+                title: l10n.retry,
                 message: apiErrorMessage(e),
                 icon: Icons.history_rounded,
                 actionLabel: l10n.retry,
@@ -73,6 +74,7 @@ class ConnectionHistoryScreen extends ConsumerWidget {
               data: (items) {
                 if (items.isEmpty) {
                   return VelvetEmptyState(
+                    title: l10n.connectionHistoryTitle,
                     message: l10n.connectionHistoryEmpty,
                     icon: Icons.history_rounded,
                     flowSteps: [

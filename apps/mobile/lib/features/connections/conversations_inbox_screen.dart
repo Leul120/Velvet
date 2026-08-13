@@ -132,6 +132,7 @@ class ConversationsInboxScreen extends ConsumerWidget {
                         return Padding(
                           padding: const EdgeInsets.only(top: 48),
                           child: VelvetEmptyState(
+                            title: l10n.conversationsInboxTitle,
                             message: isWoman
                                 ? l10n.conversationsInboxEmpty
                                 : l10n.conversationsEmptyFlowHint,

@@ -5,11 +5,10 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:velvet_mobile/core/network/dio_client.dart';
-import 'package:velvet_mobile/core/theme/velvet_theme.dart';
 import 'package:velvet_mobile/core/theme/velvet_editorial_colors.dart';
+import 'package:velvet_mobile/core/theme/velvet_theme.dart';
 import 'package:velvet_mobile/core/theme/velvet_tokens.dart';
 import 'package:velvet_mobile/core/widgets/editorial_dialog.dart';
-import 'package:velvet_mobile/core/widgets/kinetic_text.dart';
 import 'package:velvet_mobile/core/widgets/velvet_widgets.dart';
 import 'package:velvet_mobile/features/auth/auth_controller.dart';
 import 'package:velvet_mobile/features/auth/role_helpers.dart';
@@ -60,9 +59,8 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
       final profile = await ref.read(profileApiProvider).me();
       if (!mounted) return;
       setState(() {
-        city.text = profile.city?.isNotEmpty == true
-            ? profile.city!
-            : city.text;
+        city.text =
+            profile.city?.isNotEmpty == true ? profile.city! : city.text;
         english.text = profile.bioEn ?? '';
         amharic.text = profile.bioAm ?? '';
         if (profile.sessionRateEtb != null) {
@@ -115,18 +113,14 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
       error = null;
     });
     try {
-      await ref
-          .read(profileApiProvider)
-          .update(
+      await ref.read(profileApiProvider).update(
             city: city.text.trim(),
             bioEn: english.text.trim(),
             bioAm: amharic.text.trim(),
-            sessionRateEtb: _isPerformer
-                ? int.tryParse(sessionRate.text.trim())
-                : null,
-            overnightRateEtb: _isPerformer
-                ? int.tryParse(overnightRate.text.trim())
-                : null,
+            sessionRateEtb:
+                _isPerformer ? int.tryParse(sessionRate.text.trim()) : null,
+            overnightRateEtb:
+                _isPerformer ? int.tryParse(overnightRate.text.trim()) : null,
             availabilityNote: _isPerformer ? availability.text.trim() : null,
             listingActive: _isPerformer ? false : null,
           );
@@ -158,202 +152,217 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    final colors = context.velvet;
+
     return VelvetAuthScaffold(
-      body: Center(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(24, 16, 24, 48),
-          child: GlassPanel(
-            radius: VelvetTheme.radiusLg,
-            padding: const EdgeInsets.all(28),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const VelvetWordmark(size: 30),
-                const SizedBox(height: VelvetTokens.space24),
-                KineticEyebrow(
-                  label: l10n.profileSetupTitle,
-                  icon: Icons.person_outline,
-                ),
-                const SizedBox(height: VelvetTokens.space8),
-                Center(
-                  child: KineticText(
-                    text: l10n.profileSetupTitle,
-                    style: GoogleFonts.syne(
-                      fontSize: VelvetTokens.displayMedium,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: -1.3,
-                      height: 0.95,
-                      color: context.velvet.ink,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: VelvetTokens.space8),
-                Text(
-                  l10n.profileSetupBody,
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: context.velvet.muted,
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(24, 20, 24, 40),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const VelvetWordmark(size: 34, breathe: true),
+            const SizedBox(height: 24),
+            Text(
+              l10n.profileSetupTitle,
+              style: GoogleFonts.syne(
+                fontSize: 30,
+                fontWeight: FontWeight.w800,
+                letterSpacing: -0.8,
+                height: 0.98,
+                color: colors.ink,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              l10n.profileSetupBody,
+              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                    color: colors.muted,
                     height: 1.45,
                   ),
-                ),
-                      const SizedBox(height: 24),
-                      Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                l10n.profileSetupPhotos('${photos.length}/3'),
-                                style: Theme.of(context).textTheme.titleSmall,
-                              ),
-                              const SizedBox(height: 12),
-                              Wrap(
-                                spacing: 12,
-                                runSpacing: 12,
-                                children: List.generate(
-                                  3,
-                                  (i) => SizedBox(
-                                    width: 96,
-                                    height: 116,
-                                    child: i < photos.length
-                                        ? ClipRRect(
-                                            borderRadius: BorderRadius.circular(
-                                              12,
-                                            ),
-                                            child: Image.network(
-                                              photos[i],
-                                              fit: BoxFit.cover,
-                                            ),
-                                          )
-                                        : OutlinedButton(
-                                            onPressed: saving ? null : addPhoto,
-                                            child: const Icon(
-                                              Icons.add_a_photo_outlined,
-                                            ),
-                                          ),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          )
-                          .animate()
-                          .fadeIn(delay: 50.ms, duration: 400.ms)
-                          .slideY(begin: 0.05, end: 0),
-                      const SizedBox(height: 24),
-                      Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              VelvetField(
-                                controller: city,
-                                label: l10n.city,
-                                prefixIcon: const Icon(
-                                  Icons.location_city_outlined,
-                                ),
-                                textCapitalization: TextCapitalization.words,
-                                autofillHints: const [
-                                  AutofillHints.addressCity,
-                                ],
-                                textInputAction: TextInputAction.next,
-                              ),
-                              const SizedBox(height: 20),
-                              Text(
-                                l10n.promptListingEn,
-                                style: Theme.of(context).textTheme.titleSmall,
-                              ),
-                              const SizedBox(height: 8),
-                              VelvetField(
-                                controller: english,
-                                label: l10n.promptAnswerEn,
-                                prefixIcon: const Icon(
-                                  Icons.format_quote_outlined,
-                                ),
-                                maxLines: 3,
-                                maxLength: 250,
-                              ),
-                              const SizedBox(height: 20),
-                              Text(
-                                l10n.promptListingAm,
-                                style: Theme.of(context).textTheme.titleSmall,
-                              ),
-                              const SizedBox(height: 8),
-                              VelvetField(
-                                controller: amharic,
-                                label: l10n.promptAnswerAm,
-                                prefixIcon: const Icon(
-                                  Icons.format_quote_outlined,
-                                ),
-                                maxLines: 3,
-                                maxLength: 250,
-                              ),
-                            ],
-                          )
-                          .animate()
-                          .fadeIn(delay: 100.ms, duration: 400.ms)
-                          .slideY(begin: 0.05, end: 0),
-                      if (_isPerformer) ...[
-                        const SizedBox(height: 24),
-                        Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  l10n.performerRatesSection,
-                                  style: Theme.of(context).textTheme.titleSmall,
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  l10n.performerRatesHint,
-                                  style: Theme.of(context).textTheme.bodySmall,
-                                ),
-                                const SizedBox(height: 16),
-                                VelvetField(
-                                  controller: sessionRate,
-                                  label: l10n.sessionRateEtb,
-                                  keyboardType: TextInputType.number,
-                                  prefixIcon: const Icon(
-                                    Icons.payments_outlined,
-                                  ),
-                                ),
-                                const SizedBox(height: 12),
-                                VelvetField(
-                                  controller: overnightRate,
-                                  label: l10n.overnightRateEtb,
-                                  keyboardType: TextInputType.number,
-                                  prefixIcon: const Icon(
-                                    Icons.nights_stay_outlined,
-                                  ),
-                                ),
-                                const SizedBox(height: 12),
-                                VelvetField(
-                                  controller: availability,
-                                  label: l10n.availabilityNote,
-                                  prefixIcon: const Icon(
-                                    Icons.schedule_outlined,
-                                  ),
-                                ),
-                              ],
-                            )
-                            .animate()
-                            .fadeIn(delay: 150.ms, duration: 400.ms)
-                            .slideY(begin: 0.05, end: 0),
-                      ],
-                      if (error != null)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 16, bottom: 8),
-                          child: Center(
-                            child: Text(
-                              error!,
-                              style: const TextStyle(color: VelvetTheme.danger),
-                            ),
-                          ),
-                        ),
-                      const SizedBox(height: 28),
-                      VelvetButton(
-                        label: l10n.profileSetupFinish,
-                        loading: saving,
-                        onPressed: saving ? null : finish,
-                      ).animate().fadeIn(delay: 200.ms, duration: 400.ms),
-              ],
             ),
-          ),
+            const SizedBox(height: 24),
+            Container(
+              padding: const EdgeInsets.fromLTRB(20, 22, 20, 24),
+              decoration: BoxDecoration(
+                color: colors.parchmentLift,
+                borderRadius: BorderRadius.circular(VelvetTokens.radiusLg),
+                border: Border.all(color: colors.line.withValues(alpha: 0.7)),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.35),
+                    blurRadius: 28,
+                    offset: const Offset(0, 12),
+                  ),
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    l10n.profileSetupPhotos('${photos.length}/3'),
+                    style: GoogleFonts.dmSans(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                      color: colors.ink,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 12,
+                    runSpacing: 12,
+                    children: List.generate(
+                      3,
+                      (i) => SizedBox(
+                        width: 92,
+                        height: 110,
+                        child: i < photos.length
+                            ? ClipRRect(
+                                borderRadius: BorderRadius.circular(14),
+                                child: Image.network(
+                                  photos[i],
+                                  fit: BoxFit.cover,
+                                ),
+                              )
+                            : OutlinedButton(
+                                onPressed: saving ? null : addPhoto,
+                                style: OutlinedButton.styleFrom(
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(14),
+                                  ),
+                                ),
+                                child: const Icon(Icons.add_a_photo_outlined),
+                              ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 22),
+                  VelvetField(
+                    controller: city,
+                    label: l10n.city,
+                    prefixIcon: const Icon(Icons.location_city_outlined),
+                    textCapitalization: TextCapitalization.words,
+                    autofillHints: const [AutofillHints.addressCity],
+                    textInputAction: TextInputAction.next,
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    l10n.promptListingEn,
+                    style: GoogleFonts.dmSans(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13.5,
+                      color: colors.muted,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  VelvetField(
+                    controller: english,
+                    label: l10n.promptAnswerEn,
+                    prefixIcon: const Icon(Icons.format_quote_outlined),
+                    maxLines: 3,
+                    maxLength: 250,
+                  ),
+                  const SizedBox(height: 14),
+                  Text(
+                    l10n.promptListingAm,
+                    style: GoogleFonts.dmSans(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13.5,
+                      color: colors.muted,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  VelvetField(
+                    controller: amharic,
+                    label: l10n.promptAnswerAm,
+                    prefixIcon: const Icon(Icons.format_quote_outlined),
+                    maxLines: 3,
+                    maxLength: 250,
+                  ),
+                  if (_isPerformer) ...[
+                    const SizedBox(height: 20),
+                    Text(
+                      l10n.performerRatesSection,
+                      style: GoogleFonts.dmSans(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14,
+                        color: colors.ink,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      l10n.performerRatesHint,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: colors.muted,
+                          ),
+                    ),
+                    const SizedBox(height: 14),
+                    VelvetField(
+                      controller: sessionRate,
+                      label: l10n.sessionRateEtb,
+                      keyboardType: TextInputType.number,
+                      prefixIcon: const Icon(Icons.payments_outlined),
+                    ),
+                    const SizedBox(height: 12),
+                    VelvetField(
+                      controller: overnightRate,
+                      label: l10n.overnightRateEtb,
+                      keyboardType: TextInputType.number,
+                      prefixIcon: const Icon(Icons.nights_stay_outlined),
+                    ),
+                    const SizedBox(height: 12),
+                    VelvetField(
+                      controller: availability,
+                      label: l10n.availabilityNote,
+                      prefixIcon: const Icon(Icons.schedule_outlined),
+                    ),
+                  ],
+                  if (error != null) ...[
+                    const SizedBox(height: 16),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: VelvetTheme.danger.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: VelvetTheme.danger.withValues(alpha: 0.35),
+                        ),
+                      ),
+                      child: Text(
+                        error!,
+                        style: const TextStyle(
+                          color: VelvetTheme.danger,
+                          height: 1.35,
+                        ),
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 24),
+                  FilledButton(
+                    onPressed: saving ? null : finish,
+                    style: FilledButton.styleFrom(
+                      minimumSize: const Size.fromHeight(54),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                    ),
+                    child: saving
+                        ? const SizedBox(
+                            width: 22,
+                            height: 22,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: VelvetTokens.onPrimary,
+                            ),
+                          )
+                        : Text(l10n.profileSetupFinish),
+                  ),
+                ],
+              ),
+            )
+                .animate()
+                .fadeIn(delay: 60.ms, duration: 400.ms)
+                .slideY(begin: 0.04, end: 0),
+          ],
         ),
       ),
     );

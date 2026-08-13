@@ -174,6 +174,7 @@ class _AvailabilityScreenState extends ConsumerState<AvailabilityScreen> {
                 ? const VelvetContentLoading()
                 : _error != null
                 ? VelvetEmptyState(
+                    title: l10n.retry,
                     message: _error!,
                     icon: Icons.event_busy_outlined,
                     actionLabel: l10n.retry,
@@ -241,6 +242,7 @@ class _AvailabilityScreenState extends ConsumerState<AvailabilityScreen> {
                         const SizedBox(height: 8),
                         if (_windows.isEmpty)
                           VelvetEmptyState(
+                            title: l10n.availabilityUpcoming,
                             message: l10n.availabilityEmpty,
                             icon: Icons.event_available_outlined,
                           )

@@ -147,6 +147,7 @@ class _EarningsScreenState extends ConsumerState<EarningsScreen> {
                 ? const VelvetContentLoading()
                 : _error != null
                 ? VelvetEmptyState(
+                    title: l10n.retry,
                     message: _error!,
                     icon: Icons.account_balance_wallet_outlined,
                     actionLabel: l10n.retry,
@@ -269,6 +270,7 @@ class _EarningsScreenState extends ConsumerState<EarningsScreen> {
                         const SizedBox(height: 10),
                         if (summary?.recent.isEmpty != false)
                           VelvetEmptyState(
+                            title: l10n.earningsActivity,
                             message: l10n.earningsEmpty,
                             icon: Icons.receipt_long_outlined,
                           )

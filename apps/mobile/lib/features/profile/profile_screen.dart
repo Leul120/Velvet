@@ -294,6 +294,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       body: meAsync.when(
         loading: () => const VelvetContentLoading(),
         error: (e, _) => VelvetEmptyState(
+          title: l10n.profile,
           message: apiErrorMessage(e),
           icon: Icons.person_outline,
           actionLabel: l10n.retry,
