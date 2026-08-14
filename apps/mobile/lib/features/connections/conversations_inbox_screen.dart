@@ -29,48 +29,47 @@ class ConversationsInboxScreen extends ConsumerWidget {
       mistIntensity: 0.7,
       safeArea: true,
       extendBody: true,
-      body: NestedScrollView(
-        headerSliverBuilder: (context, innerBoxIsScrolled) => [
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(
-                VelvetTokens.pageInset,
-                VelvetTokens.space32,
-                VelvetTokens.pageInset,
-                VelvetTokens.space8,
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  KineticEyebrow(
-                    label: l10n.navConversations,
-                    icon: Icons.forum_outlined,
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              VelvetTokens.pageInset,
+              VelvetTokens.space24,
+              VelvetTokens.pageInset,
+              VelvetTokens.space8,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                KineticEyebrow(
+                  label: l10n.navConversations,
+                  icon: Icons.forum_outlined,
+                ),
+                const SizedBox(height: VelvetTokens.space8),
+                KineticText(
+                  text: l10n.conversationsInboxTitle,
+                  style: GoogleFonts.syne(
+                    fontSize: VelvetTokens.displayMedium,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -1.3,
+                    height: 0.95,
+                    color: context.velvet.ink,
                   ),
-                  const SizedBox(height: VelvetTokens.space8),
-                  KineticText(
-                    text: l10n.conversationsInboxTitle,
-                    style: GoogleFonts.syne(
-                      fontSize: VelvetTokens.displayMedium,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: -1.3,
-                      height: 0.95,
-                      color: context.velvet.ink,
-                    ),
+                ),
+                const SizedBox(height: VelvetTokens.space8),
+                Text(
+                  l10n.conversationsInboxHint,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: context.velvet.muted,
+                    height: 1.45,
                   ),
-                  const SizedBox(height: VelvetTokens.space8),
-                  Text(
-                    l10n.conversationsInboxHint,
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: context.velvet.muted,
-                      height: 1.45,
-                    ),
-                  ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
-        ],
-        body: mutual.when(
+          Expanded(
+            child: mutual.when(
               loading: () => const VelvetContentLoading(),
               error: (e, _) => Center(
                 child: Padding(
@@ -112,7 +111,7 @@ class ConversationsInboxScreen extends ConsumerWidget {
                   (total, item) => total + item.unreadCount,
                 );
                 return RefreshIndicator(
-                  color: VelvetTheme.teal,
+                  color: VelvetTokens.ember,
                   onRefresh: () async {
                     ref.invalidate(conversationsProvider);
                     await ref.read(conversationsProvider.future);
@@ -201,6 +200,8 @@ class ConversationsInboxScreen extends ConsumerWidget {
                 );
               },
             ),
+          ),
+        ],
       ),
     );
   }
@@ -219,70 +220,31 @@ class _InboxPulse extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.velvet;
     return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.fromLTRB(22, 26, 22, 26),
+      margin: const EdgeInsets.only(bottom: 4),
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            VelvetTokens.emberSoft.withValues(alpha: 0.25),
-            VelvetTokens.parchmentLift.withValues(alpha: 0.95),
-          ],
-        ),
-        borderRadius: BorderRadius.only(
-          topLeft: Radius.circular(VelvetTokens.radiusXl),
-          topRight: Radius.circular(VelvetTokens.radiusSm),
-          bottomLeft: Radius.circular(VelvetTokens.radiusSm),
-          bottomRight: Radius.circular(VelvetTokens.radiusXl),
-        ),
-        border: Border.all(color: VelvetTokens.ember.withValues(alpha: 0.28)),
-        boxShadow: VelvetTokens.emberHalo(strength: 0.45),
+        color: colors.parchmentLift,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: colors.line.withValues(alpha: 0.7)),
       ),
       child: Row(
         children: [
+          _InboxCount(value: turnsWaiting, label: l10n.yourTurn),
           Container(
-            width: 42,
-            height: 42,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: VelvetTokens.ember.withValues(alpha: 0.12),
-              border: Border.all(
-                color: VelvetTokens.ember.withValues(alpha: 0.35),
-              ),
-            ),
-            child: const Icon(
-              Icons.forum_outlined,
-              color: VelvetTokens.ember,
-            ),
+            width: 1,
+            height: 28,
+            margin: const EdgeInsets.symmetric(horizontal: 16),
+            color: colors.line,
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Row(
-              children: [
-                _InboxCount(value: turnsWaiting, label: l10n.yourTurn),
-                Container(
-                  width: 1,
-                  height: 28,
-                  margin: const EdgeInsets.symmetric(horizontal: 16),
-                  color: VelvetTheme.line,
-                ),
-                _InboxCount(
-                  value: unreadTotal,
-                  label: l10n.conversationsInboxTitle,
-                ),
-              ],
-            ),
-          ),
-          Icon(
-            Icons.keyboard_arrow_down_rounded,
-            color: context.velvet.muted,
+          _InboxCount(
+            value: unreadTotal,
+            label: l10n.conversationsInboxTitle,
           ),
         ],
       ),
-    ).animate().fadeIn(duration: 280.ms).slideY(begin: -0.03, end: 0);
+    ).animate().fadeIn(duration: 280.ms);
   }
 }
 
@@ -301,7 +263,7 @@ class _InboxCount extends StatelessWidget {
           '$value',
           style: GoogleFonts.syne(
             color: context.velvet.ink,
-            fontSize: 54,
+            fontSize: 28,
             fontWeight: FontWeight.w800,
             letterSpacing: -2.5,
             height: 0.9,

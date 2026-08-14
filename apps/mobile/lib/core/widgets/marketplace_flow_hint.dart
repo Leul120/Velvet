@@ -92,13 +92,26 @@ class DiscoverCoachBanner extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(14, 12, 4, 12),
       decoration: BoxDecoration(
         color: colors.parchmentLift,
-        borderRadius: BorderRadius.circular(VelvetTokens.radiusMd),
-        border: Border.all(color: VelvetTokens.ember.withValues(alpha: 0.28)),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: colors.line.withValues(alpha: 0.7)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(Icons.route_outlined, color: VelvetTokens.ember, size: 20),
+          Container(
+            width: 32,
+            height: 32,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: VelvetTokens.ember.withValues(alpha: 0.14),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Icon(
+              Icons.route_outlined,
+              color: VelvetTokens.ember,
+              size: 18,
+            ),
+          ),
           const SizedBox(width: 10),
           Expanded(
             child: Column(

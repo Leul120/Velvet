@@ -1434,4 +1434,21 @@ class AppLocalizationsAm extends AppLocalizations {
   @override
   String get conversationsEmptyFlowHint =>
       'መጀመሪያ በlisting ላይ ፍላጎት ይላኩ — ከተገናኙ በኋላ conversations ይከፈታሉ።';
+
+  @override
+  String get listingSession => 'ክፍለ ጊዜ';
+
+  @override
+  String get listingOvernight => 'ምሽት';
+
+  @override
+  String get listingAbout => 'ኃይሏ';
+
+  @override
+  String get listingClose => 'ዝጋ';
+
+  @override
+  String listingEtbAmount(int amount) {
+    return '$amount ብር';
+  }
 }

@@ -44,6 +44,8 @@ mvn spring-boot:run
 - Health: http://localhost:8080/actuator/health  
 - Swagger: http://localhost:8080/swagger-ui.html  
 - Seed invite code: `VELVET-SEED`  
+- Demo clients: `+251911100001`–`024` (Abel … Yared)  
+- Demo performers: `+251911200001`–`036` (Sara … Soliyana)  
 - Dev OTP is returned in the API response when `OTP_EXPOSE=true` (default locally)
 
 ### 3. Mobile
@@ -119,7 +121,7 @@ curl -s http://localhost:8080/v1/auth/otp/verify \
 - Seed venue partner desk (`+251911000010`) + public `/waitlist/` landing
 - Local NLP moderation stub + ops readiness + Telebirr live fail-fast + FCM push scaffolding
 - Chat exclusive media (image/video/audio/file) + API media proxy + Android screenshot block
-- Local demo roster (12 men / 18 women) wipe+reseed on every API boot (`VELVET_SEED_RESET`)
+- Local demo roster (24 clients / 60 performers) wipe+reseed on every API boot (`VELVET_SEED_RESET`)
 
 ## Next builds
 

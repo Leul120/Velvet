@@ -1498,4 +1498,21 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get conversationsEmptyFlowHint =>
       'Send discreet interest when a listing catches your eye — the conversation opens only after you both choose to connect.';
+
+  @override
+  String get listingSession => 'Session';
+
+  @override
+  String get listingOvernight => 'Overnight';
+
+  @override
+  String get listingAbout => 'Energy';
+
+  @override
+  String get listingClose => 'Close';
+
+  @override
+  String listingEtbAmount(int amount) {
+    return '$amount ETB';
+  }
 }

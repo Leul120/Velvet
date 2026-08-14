@@ -247,7 +247,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           title: l10n.panicSent,
           message: l10n.panicSentDetails,
           icon: Icons.check_circle_outline_rounded,
-          iconColor: VelvetTheme.teal,
+          iconColor: VelvetTokens.ember,
           actions: [
             EditorialDialogAction(
               label: l10n.close,
@@ -309,7 +309,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             ),
             slivers: [
               SliverAppBar(
-                expandedHeight: 480,
+                expandedHeight: 300,
                 pinned: true,
                 stretch: true,
                 backgroundColor: Colors.transparent,
@@ -348,7 +348,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                         me.phone,
                         style: TextStyle(
                           fontSize: 14,
-                          color: VelvetTheme.champagne.withValues(alpha: 0.9),
+                          color: VelvetTokens.ember.withValues(alpha: 0.92),
                           shadows: [
                             Shadow(
                               color: Colors.black.withValues(alpha: 0.8),
@@ -408,7 +408,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                               color:
                                   me.role == 'ADMIN' || me.role == 'CONCIERGE'
                                   ? VelvetTheme.mistSlate
-                                  : VelvetTheme.teal,
+                                  : VelvetTokens.ember,
                             ),
                             if (me.gender == 'MALE')
                               _RoleChip(
@@ -418,7 +418,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                             if (me.gender == 'FEMALE')
                               _RoleChip(
                                 label: l10n.genderFemale.split(' — ').first,
-                                color: VelvetTheme.tealDeep,
+                                color: VelvetTokens.ember,
                               ),
                             if (me.trustScore != null && me.trustScore! >= 80)
                               const VelvetTrustedBadge(compact: true),
@@ -438,9 +438,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                               ?.copyWith(color: context.velvet.muted),
                         ),
                         const SizedBox(height: 10),
-                        GlassPanel(
+                        _LiftCard(
                           padding: const EdgeInsets.all(12),
-                          fill: VelvetTheme.glassFill,
                           child: SizedBox(
                             height: 96,
                             child: Row(
@@ -528,7 +527,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                                           vertical: 2,
                                                         ),
                                                     decoration: BoxDecoration(
-                                                      color: VelvetTheme.teal,
+                                                      color: VelvetTokens.ember,
                                                       borderRadius:
                                                           BorderRadius.circular(
                                                             6,
@@ -537,7 +536,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                                     child: const Text(
                                                       '1',
                                                       style: TextStyle(
-                                                        color: Colors.white,
+                                                        color: VelvetTokens
+                                                            .onPrimary,
                                                         fontSize: 10,
                                                         fontWeight:
                                                             FontWeight.w700,
@@ -624,7 +624,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                       children: [
                                         const Icon(
                                           Icons.add_a_photo_outlined,
-                                          color: VelvetTheme.teal,
+                                          color: VelvetTokens.ember,
                                         ),
                                         const SizedBox(height: 4),
                                         Text(
@@ -639,9 +639,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                           ),
                         ),
                         const SizedBox(height: 20),
-                        GlassPanel(
+                        _LiftCard(
                           padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
-                          fill: VelvetTheme.glassFill,
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
@@ -825,10 +824,24 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                 ),
                               ],
                               const SizedBox(height: 16),
-                              VelvetButton(
-                                label: l10n.save,
-                                loading: _saving,
+                              FilledButton(
                                 onPressed: _saving ? null : _save,
+                                style: FilledButton.styleFrom(
+                                  minimumSize: const Size.fromHeight(52),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(999),
+                                  ),
+                                ),
+                                child: _saving
+                                    ? const SizedBox(
+                                        width: 22,
+                                        height: 22,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          color: VelvetTokens.onPrimary,
+                                        ),
+                                      )
+                                    : Text(l10n.save),
                               ),
                             ],
                           ),
@@ -893,12 +906,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                           onTap: () => _openLegal('/legal/'),
                         ),
                         const SizedBox(height: 8),
-                        GlassPanel(
+                        _LiftCard(
                           padding: const EdgeInsets.symmetric(
                             horizontal: 14,
                             vertical: 10,
                           ),
-                          fill: VelvetTheme.glassFill,
                           child: Row(
                             children: [
                               Expanded(
@@ -1066,6 +1078,27 @@ class _RoleChip extends StatelessWidget {
           color: color,
         ),
       ),
+    );
+  }
+}
+
+class _LiftCard extends StatelessWidget {
+  const _LiftCard({required this.child, this.padding});
+
+  final Widget child;
+  final EdgeInsetsGeometry? padding;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.velvet;
+    return Container(
+      padding: padding,
+      decoration: BoxDecoration(
+        color: colors.parchmentLift,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: colors.line.withValues(alpha: 0.7)),
+      ),
+      child: child,
     );
   }
 }

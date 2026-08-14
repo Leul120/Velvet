@@ -3,6 +3,11 @@ package com.velvet.api.identity.security;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.velvet.api.common.api.ApiError;
 import com.velvet.api.common.config.VelvetProperties;
+import jakarta.servlet.DispatcherType;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -25,6 +30,8 @@ import java.util.List;
 @EnableMethodSecurity
 public class SecurityConfig {
 
+    private static final Logger log = LoggerFactory.getLogger(SecurityConfig.class);
+
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
     private final VelvetProperties properties;
     private final ObjectMapper objectMapper;
@@ -46,24 +53,17 @@ public class SecurityConfig {
                 .cors(Customizer.withDefaults())
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .exceptionHandling(ex -> ex
-                        .authenticationEntryPoint((request, response, authException) -> {
-                            response.setStatus(401);
-                            response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-                            objectMapper.writeValue(
-                                    response.getOutputStream(),
-                                    ApiError.of("UNAUTHORIZED", "Sign in required.")
-                            );
-                        })
-                        .accessDeniedHandler((request, response, accessDeniedException) -> {
-                            response.setStatus(403);
-                            response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-                            objectMapper.writeValue(
-                                    response.getOutputStream(),
-                                    ApiError.of("FORBIDDEN", "You do not have access to this resource.")
-                            );
-                        })
+                        .authenticationEntryPoint((request, response, authException) ->
+                                writeSecurityError(request, response, 401, "UNAUTHORIZED", "Sign in required."))
+                        .accessDeniedHandler((request, response, accessDeniedException) ->
+                                writeSecurityError(request, response, 403, "FORBIDDEN", "You do not have access to this resource."))
                 )
                 .authorizeHttpRequests(auth -> auth
+                        // SSE (chat stream) and Boot's /error page re-enter the filter chain
+                        // after the response is committed. Securing those dispatcher types
+                        // turns a normal 401/403 into this servlet crash.
+                        .dispatcherTypeMatchers(DispatcherType.ASYNC, DispatcherType.ERROR).permitAll()
+                        .requestMatchers("/error").permitAll()
                         .requestMatchers(
                                 "/actuator/health",
                                 "/actuator/info",
@@ -102,6 +102,27 @@ public class SecurityConfig {
                 )
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
         return http.build();
+    }
+
+    private void writeSecurityError(
+            HttpServletRequest request,
+            HttpServletResponse response,
+            int status,
+            String code,
+            String message
+    ) {
+        if (response.isCommitted()) {
+            log.warn("{} on committed {} {}", code, request.getMethod(), request.getRequestURI());
+            return;
+        }
+        try {
+            response.resetBuffer();
+            response.setStatus(status);
+            response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+            objectMapper.writeValue(response.getOutputStream(), ApiError.of(code, message));
+        } catch (Exception e) {
+            log.warn("Could not write {} for {}", code, request.getRequestURI(), e);
+        }
     }
 
     @Bean

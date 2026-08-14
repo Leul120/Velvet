@@ -537,5 +537,15 @@
   "flowHintRequest": "ጥያቄ",
   "flowHintBook": "Booking",
   "flowHintRespond": "መልስ",
-  "conversationsEmptyFlowHint": "መጀመሪያ በlisting ላይ ፍላጎት ይላኩ — ከተገናኙ በኋላ conversations ይከፈታሉ።"
+  "conversationsEmptyFlowHint": "መጀመሪያ በlisting ላይ ፍላጎት ይላኩ — ከተገናኙ በኋላ conversations ይከፈታሉ።",
+  "listingSession": "ክፍለ ጊዜ",
+  "listingOvernight": "ምሽት",
+  "listingAbout": "ኃይሏ",
+  "listingClose": "ዝጋ",
+  "listingEtbAmount": "{amount} ብር",
+  "@listingEtbAmount": {
+    "placeholders": {
+      "amount": { "type": "int" }
+    }
+  }
 }

@@ -127,7 +127,14 @@ public class BillingService {
             throw new BusinessException("BOOKING_NO_AMOUNT", "This booking has no rate set — negotiate in chat first.");
         }
         if ("PENDING".equals(booking.getPaymentStatus())) {
-            throw new BusinessException("BOOKING_PAYMENT_PENDING", "A payment is already awaiting verification.");
+            BillingDtos.CheckoutResponse existing = getPendingBookingCheckout(userId, bookingId);
+            if (existing != null) {
+                return existing;
+            }
+            throw new BusinessException(
+                    "BOOKING_PAYMENT_PENDING",
+                    "A payment is already awaiting verification. Refresh the booking screen and try again."
+            );
         }
 
         BigDecimal amount = BigDecimal.valueOf(booking.getAmountEtb()).setScale(2, RoundingMode.HALF_UP);

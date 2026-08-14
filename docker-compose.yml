@@ -77,12 +77,14 @@ services:
       # Relative /v1/media/{key} URLs — phones only need API port 8088
       S3_PUBLIC_BASE: relative
       ADMIN_BOOTSTRAP_PHONE: ${ADMIN_BOOTSTRAP_PHONE:-+251911000000}
-      # CBE receipt verification. Values are supplied by the ignored root .env file.
+      # CBE: set CBE_VERIFIER_MODE in .env — mock (offline) | live (verifier API) | direct (CBE PDF; often blocked in Docker)
       CBE_VERIFIER_MODE: ${CBE_VERIFIER_MODE:-mock}
       CBE_VERIFIER_BASE_URL: ${CBE_VERIFIER_BASE_URL:-https://verifyapi.leulzenebe.pro}
       CBE_VERIFIER_API_KEY: ${CBE_VERIFIER_API_KEY:-}
+      CBE_ACCOUNT_NAME: ${CBE_ACCOUNT_NAME:-VELVET Ethiopia}
       CBE_ACCOUNT_NUMBER: ${CBE_ACCOUNT_NUMBER:-1000123456789}
       CBE_ACCOUNT_SUFFIX: ${CBE_ACCOUNT_SUFFIX:-12345678}
+      CBE_BANK_NAME: ${CBE_BANK_NAME:-Commercial Bank of Ethiopia}
     # Host 8080 already used — map to 8088
     ports:
       - "8088:8080"

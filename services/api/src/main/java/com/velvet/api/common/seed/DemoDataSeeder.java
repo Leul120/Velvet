@@ -42,6 +42,6 @@ public class DemoDataSeeder implements ApplicationRunner {
         populator.setSeparator(";");
         populator.addScript(new ClassPathResource("db/seed/demo_roster.sql"));
         populator.execute(dataSource);
-        log.info("Demo roster ready — invite VELVET-SEED, men +251911100001–012, women +251911200001–018, chat/bookings/notifications seeded");
+        log.info("Demo roster ready — invite VELVET-SEED, clients +251911100001–024, performers +251911200001–060");
     }
 }

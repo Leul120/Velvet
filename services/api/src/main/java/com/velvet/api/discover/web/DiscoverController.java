@@ -23,7 +23,7 @@ public class DiscoverController {
     @GetMapping
     public ResponseEntity<DiscoverDtos.DiscoverFeedResponse> feed(
             @AuthenticationPrincipal VelvetPrincipal principal,
-            @RequestParam(defaultValue = "20") int limit
+            @RequestParam(defaultValue = "50") int limit
     ) {
         return ResponseEntity.ok(discoverService.feed(principal.getUserId(), limit));
     }
@@ -31,7 +31,7 @@ public class DiscoverController {
     @GetMapping("/received")
     public ResponseEntity<DiscoverDtos.DiscoverFeedResponse> received(
             @AuthenticationPrincipal VelvetPrincipal principal,
-            @RequestParam(defaultValue = "20") int limit
+            @RequestParam(defaultValue = "50") int limit
     ) {
         return ResponseEntity.ok(discoverService.receivedLikes(principal.getUserId(), limit));
     }
@@ -39,7 +39,7 @@ public class DiscoverController {
     @GetMapping("/passes")
     public ResponseEntity<DiscoverDtos.DiscoverFeedResponse> recentPasses(
             @AuthenticationPrincipal VelvetPrincipal principal,
-            @RequestParam(defaultValue = "5") int limit
+            @RequestParam(defaultValue = "20") int limit
     ) {
         return ResponseEntity.ok(discoverService.recentPasses(principal.getUserId(), limit));
     }

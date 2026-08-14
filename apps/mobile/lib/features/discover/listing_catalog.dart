@@ -1,18 +1,14 @@
-import 'dart:ui';
-
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:velvet_mobile/core/theme/velvet_theme.dart';
-import 'package:velvet_mobile/core/theme/velvet_editorial_colors.dart';
+import 'package:velvet_mobile/core/network/media_url.dart';
 import 'package:velvet_mobile/core/theme/velvet_tokens.dart';
-import 'package:velvet_mobile/core/widgets/editorial_list_card.dart';
-import 'package:velvet_mobile/core/widgets/velvet_editorial_sheet.dart';
-import 'package:velvet_mobile/core/widgets/velvet_widgets.dart';
-import 'package:velvet_mobile/core/widgets/velvet_image_carousel.dart';
+import 'package:velvet_mobile/features/discover/listing_detail_screen.dart';
 import 'package:velvet_mobile/l10n/generated/app_localizations.dart';
+
+export 'listing_detail_screen.dart'
+    show ListingCardData, ListingDetailActions, openListingDetail;
 
 /// Soft asymmetric radii for masonry rhythm.
 BorderRadius listingTileRadius(int index) {
@@ -38,11 +34,36 @@ bool listingTileIsTall(int index) => listingTileAspectRatio(index) < 0.75;
 
 /// Distinct portrait ratios so columns stagger like Pinterest masonry.
 double listingTileAspectRatio(int index) {
-  const ratios = [0.58, 0.78, 0.68, 0.88, 0.62, 0.74, 0.92, 0.66];
+  const ratios = [0.52, 0.84, 0.62, 0.96, 0.56, 0.74, 0.90, 0.60];
   return ratios[index % ratios.length];
 }
 
-/// Two-column Pinterest-style masonry grid.
+Widget _masonryTiles({
+  required int itemCount,
+  required IndexedWidgetBuilder itemBuilder,
+  required double gutter,
+}) {
+  return StaggeredGrid.count(
+    crossAxisCount: 2,
+    mainAxisSpacing: gutter,
+    crossAxisSpacing: gutter,
+    children: [
+      for (var i = 0; i < itemCount; i++)
+        StaggeredGridTile.fit(
+          crossAxisCellCount: 1,
+          child: Builder(
+            builder: (context) => itemBuilder(context, i),
+          ),
+        ),
+    ],
+  );
+}
+
+/// Two-column Pinterest-style masonry.
+///
+/// Implemented as a single [ListView] wrapping a box [StaggeredGrid], not a
+/// nested [MasonryGridView] viewport. Nested sliver-masonry + [PageView]
+/// tiles collapse to one column under the member shell constraints.
 class AsymmetricListingGrid extends StatelessWidget {
   const AsymmetricListingGrid({
     super.key,
@@ -54,7 +75,7 @@ class AsymmetricListingGrid extends StatelessWidget {
       VelvetTokens.pageInset,
       96,
     ),
-    this.gutter = VelvetTokens.space10,
+    this.gutter = VelvetTokens.space12,
     this.shrinkWrap = false,
     this.physics,
   });
@@ -69,24 +90,31 @@ class AsymmetricListingGrid extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final bottom = padding.bottom + MediaQuery.paddingOf(context).bottom;
+    final grid = _masonryTiles(
+      itemCount: itemCount,
+      itemBuilder: itemBuilder,
+      gutter: gutter,
+    );
 
-    return MasonryGridView.count(
-      crossAxisCount: 2,
-      mainAxisSpacing: gutter,
-      crossAxisSpacing: gutter,
-      padding: padding.copyWith(bottom: bottom),
-      shrinkWrap: shrinkWrap,
+    if (shrinkWrap) {
+      return Padding(
+        padding: padding.copyWith(bottom: bottom),
+        child: grid,
+      );
+    }
+
+    return ListView(
       physics: physics ??
           const AlwaysScrollableScrollPhysics(
             parent: BouncingScrollPhysics(),
           ),
-      itemCount: itemCount,
-      itemBuilder: itemBuilder,
+      padding: padding.copyWith(bottom: bottom),
+      children: [grid],
     );
   }
 }
 
-/// Sliver version for CustomScrollView / NestedScrollView headers.
+/// Sliver version for CustomScrollView headers.
 class AsymmetricListingSliver extends StatelessWidget {
   const AsymmetricListingSliver({
     super.key,
@@ -98,7 +126,7 @@ class AsymmetricListingSliver extends StatelessWidget {
       VelvetTokens.pageInset,
       96,
     ),
-    this.gutter = VelvetTokens.space10,
+    this.gutter = VelvetTokens.space12,
   });
 
   final int itemCount;
@@ -111,219 +139,17 @@ class AsymmetricListingSliver extends StatelessWidget {
     final bottom = padding.bottom + MediaQuery.paddingOf(context).bottom;
     return SliverPadding(
       padding: padding.copyWith(bottom: bottom),
-      sliver: SliverMasonryGrid.count(
-        crossAxisCount: 2,
-        mainAxisSpacing: gutter,
-        crossAxisSpacing: gutter,
-        childCount: itemCount,
-        itemBuilder: itemBuilder,
+      sliver: SliverToBoxAdapter(
+        child: _masonryTiles(
+          itemCount: itemCount,
+          itemBuilder: itemBuilder,
+          gutter: gutter,
+        ),
       ),
     );
   }
 }
 
-class ListingCardData {
-  const ListingCardData({
-    required this.id,
-    required this.name,
-    this.age,
-    this.city,
-    this.bio,
-    this.bioHeading,
-    this.photoUrls = const [],
-    this.subtitle,
-    this.distanceKm,
-    this.sessionRateEtb,
-    this.overnightRateEtb,
-    this.availabilityNote,
-    this.verified = false,
-    this.requestReason,
-    this.notedPhotoUrl,
-    this.trustScore,
-  });
-
-  final String id;
-  final String name;
-  final int? age;
-  final String? city;
-  final String? bio;
-  final String? bioHeading;
-  final List<String> photoUrls;
-  final String? subtitle;
-  final double? distanceKm;
-  final int? sessionRateEtb;
-  final int? overnightRateEtb;
-  final String? availabilityNote;
-  final bool verified;
-  final String? requestReason;
-  final String? notedPhotoUrl;
-  final int? trustScore;
-}
-
-Future<void> showListingDetail(BuildContext context, ListingCardData listing) {
-  final l10n = AppLocalizations.of(context);
-  return showEditorialSheet<void>(
-    context: context,
-    initialSize: 0.88,
-    maxSize: 0.96,
-    builder: (context, scrollCtrl) {
-      return CustomScrollView(
-        controller: scrollCtrl,
-        physics: const BouncingScrollPhysics(
-          parent: AlwaysScrollableScrollPhysics(),
-        ),
-        slivers: [
-          SliverToBoxAdapter(
-            child: SizedBox(
-              height: 360,
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  if (listing.photoUrls.isNotEmpty)
-                    VelvetImageCarousel(
-                      photoUrls: listing.photoUrls,
-                      aspectRatio: 0.75,
-                      borderRadius: BorderRadius.zero,
-                    )
-                  else
-                    Container(color: VelvetTokens.parchmentDeep),
-                  DecoratedBox(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          Colors.transparent,
-                          VelvetTokens.ink.withValues(alpha: 0.55),
-                        ],
-                        stops: const [0.55, 1],
-                      ),
-                    ),
-                  ),
-                  Positioned(
-                    left: VelvetTokens.pageInset,
-                    right: VelvetTokens.pageInset,
-                    bottom: 24,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        if (listing.verified || (listing.trustScore ?? 0) >= 80)
-                          Row(
-                            children: [
-                              if (listing.verified)
-                                const VelvetVerifiedBadge(onDark: true),
-                              if (listing.trustScore != null &&
-                                  listing.trustScore! >= 80) ...[
-                                const SizedBox(width: 8),
-                                const VelvetTrustedBadge(compact: true),
-                              ],
-                            ],
-                          ),
-                        const SizedBox(height: 8),
-                        Text(
-                          listing.name,
-                          style: GoogleFonts.syne(
-                            color: Colors.white,
-                            fontSize: 34,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: -1.1,
-                            height: 0.95,
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          [
-                            if (listing.age != null) '${listing.age}',
-                            if (listing.city?.isNotEmpty == true) listing.city!,
-                          ].join(' · '),
-                          style: GoogleFonts.dmSans(
-                            color: Colors.white.withValues(alpha: 0.85),
-                            fontSize: 15,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          SliverPadding(
-            padding: const EdgeInsets.fromLTRB(22, 20, 22, 40),
-            sliver: SliverList(
-              delegate: SliverChildListDelegate([
-                          Wrap(
-                            spacing: 8,
-                            runSpacing: 8,
-                            children: [
-                              if (listing.sessionRateEtb != null)
-                                _RateChip(
-                                  label: l10n.rateSessionLabel(
-                                    listing.sessionRateEtb!,
-                                  ),
-                                ),
-                              if (listing.overnightRateEtb != null)
-                                _RateChip(
-                                  label: l10n.rateOvernightLabel(
-                                    listing.overnightRateEtb!,
-                                  ),
-                                ),
-                              if (listing.availabilityNote?.isNotEmpty == true)
-                                _RateChip(
-                                  label: listing.availabilityNote!,
-                                  icon: Icons.schedule_outlined,
-                                ),
-                              if (listing.distanceKm != null)
-                                _RateChip(
-                                  label: listing.distanceKm != null
-                                      ? l10n.listingDistanceKm(
-                                          listing.distanceKm!.round(),
-                                        )
-                                      : 'Nearby',
-                                ),
-                            ],
-                          ),
-                          if (listing.subtitle?.isNotEmpty == true) ...[
-                            const SizedBox(height: 20),
-                            Text(
-                              listing.subtitle!,
-                              style: Theme.of(context).textTheme.titleMedium
-                                  ?.copyWith(
-                                    color: VelvetTheme.teal,
-                                    height: 1.4,
-                                  ),
-                            ),
-                          ],
-                          if (listing.bio?.isNotEmpty == true) ...[
-                            const SizedBox(height: 24),
-                            if (listing.bioHeading?.isNotEmpty == true)
-                              Text(
-                                listing.bioHeading!,
-                                style: Theme.of(context).textTheme.titleSmall
-                                    ?.copyWith(
-                                      color: context.velvet.muted,
-                                      letterSpacing: 0,
-                                    ),
-                              ),
-                            const SizedBox(height: 8),
-                            Text(
-                              listing.bio!,
-                              style: Theme.of(context).textTheme.bodyLarge
-                                  ?.copyWith(
-                                    height: 1.65,
-                                    color: context.velvet.ink,
-                                  ),
-                            ),
-                          ],
-                        ]),
-            ),
-          ),
-        ],
-      );
-    },
-  );
-}
 
 class PerformerListingTile extends StatelessWidget {
   const PerformerListingTile({
@@ -350,7 +176,7 @@ class PerformerListingTile extends StatelessWidget {
     ].join(', ');
     final rateLabel = listing.sessionRateEtb == null
         ? null
-        : l10n.rateSessionLabel(listing.sessionRateEtb!);
+        : l10n.listingEtbAmount(listing.sessionRateEtb!);
     final radius = listingTileRadius(index);
     final aspect = listingTileAspectRatio(index);
     final meta = [
@@ -358,266 +184,164 @@ class PerformerListingTile extends StatelessWidget {
       if (rateLabel != null) rateLabel,
     ].join(' · ');
 
-    return Material(
-          color: Colors.transparent,
-          elevation: 0,
-          child: InkWell(
-            onTap: () => showListingDetail(context, listing),
-            borderRadius: radius,
-            child: Ink(
-              decoration: BoxDecoration(
-                borderRadius: radius,
-                boxShadow: [
-                  BoxShadow(
-                    color: VelvetTokens.ink.withValues(alpha: 0.14),
-                    blurRadius: 28,
-                    spreadRadius: -6,
-                    offset: const Offset(0, 14),
-                  ),
-                  BoxShadow(
-                    color: VelvetTokens.ember.withValues(alpha: 0.06),
-                    blurRadius: 40,
-                    spreadRadius: -12,
-                    offset: const Offset(0, 20),
-                  ),
-                ],
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final width = constraints.maxWidth.isFinite
+            ? constraints.maxWidth
+            : MediaQuery.sizeOf(context).width / 2 - VelvetTokens.pageInset;
+        final height = width / aspect;
+        return SizedBox(
+          width: width,
+          height: height,
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: () => openListingDetail(
+                context,
+                listing,
+                actions: ListingDetailActions(
+                  primaryLabel: l10n.requestBooking,
+                  onPrimary: onRequest,
+                  secondaryLabel: l10n.skipListing,
+                  onSecondary: onSkip,
+                  loading: loading,
+                ),
               ),
+              borderRadius: radius,
               child: ClipRRect(
                 borderRadius: radius,
-                child: AspectRatio(
-                  aspectRatio: aspect,
-                  child: Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      VelvetImageCarousel(
-                        photoUrls: listing.photoUrls,
-                        aspectRatio: aspect,
-                        borderRadius: BorderRadius.zero,
-                        showGradient: false,
-                      ),
-                      const DecoratedBox(
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topCenter,
-                            end: Alignment.bottomCenter,
-                            colors: [
-                              Color(0x33000000),
-                              Color(0x00000000),
-                              Color(0x99000000),
-                            ],
-                            stops: [0, 0.38, 1],
-                          ),
-                        ),
-                      ),
-                      if (listing.verified)
-                        Positioned(
-                          top: 12,
-                          right: 12,
-                          child: _GlassChip(
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  Icons.verified_rounded,
-                                  size: 14,
-                                  color: Colors.white.withValues(alpha: 0.95),
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  'Verified',
-                                  style: GoogleFonts.dmSans(
-                                    color: Colors.white,
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w600,
-                                    letterSpacing: 0.2,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      Positioned(
-                        left: 12,
-                        right: 56,
-                        bottom: 12,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              title,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: GoogleFonts.syne(
-                                color: Colors.white,
-                                fontSize: 20,
-                                fontWeight: FontWeight.w700,
-                                letterSpacing: -0.6,
-                                height: 1.05,
-                                shadows: const [
-                                  Shadow(
-                                    color: Color(0x66000000),
-                                    blurRadius: 12,
-                                  ),
-                                ],
-                              ),
-                            ),
-                            if (meta.isNotEmpty) ...[
-                              const SizedBox(height: 4),
-                              Text(
-                                meta,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: GoogleFonts.dmSans(
-                                  color: Colors.white.withValues(alpha: 0.82),
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ],
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    _ListingTilePhoto(photoUrls: listing.photoUrls),
+                    const DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            Color(0x22000000),
+                            Color(0x00000000),
+                            Color(0xCC000000),
                           ],
+                          stops: [0, 0.42, 1],
                         ),
                       ),
+                    ),
+                    if (listing.verified)
                       Positioned(
                         top: 10,
-                        left: 10,
-                        child: _OverlayIconButton(
-                          icon: Icons.close_rounded,
-                          onTap: loading ? null : onSkip,
+                        right: 10,
+                        child: Container(
+                          width: 22,
+                          height: 22,
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            color: VelvetTokens.ember,
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.35),
+                                blurRadius: 8,
+                              ),
+                            ],
+                          ),
+                          child: const Icon(
+                            Icons.verified_rounded,
+                            size: 13,
+                            color: VelvetTokens.onPrimary,
+                          ),
                         ),
                       ),
-                      Positioned(
-                        bottom: 12,
-                        right: 12,
-                        child: _OverlayPrimaryIconButton(
-                          loading: loading,
-                          onTap: loading ? null : onRequest,
-                          tooltip: l10n.requestBooking,
+                    Positioned(
+                      left: 12,
+                      right: 12,
+                      bottom: 12,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.syne(
+                              color: Colors.white,
+                              fontSize: listingTileIsTall(index) ? 18 : 16,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: -0.5,
+                              height: 1.05,
+                            ),
+                          ),
+                          if (meta.isNotEmpty) ...[
+                            const SizedBox(height: 3),
+                            Text(
+                              meta,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: GoogleFonts.dmSans(
+                                color: Colors.white.withValues(alpha: 0.78),
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                    if (loading)
+                      const ColoredBox(
+                        color: Color(0x66000000),
+                        child: Center(
+                          child: SizedBox(
+                            width: 22,
+                            height: 22,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: VelvetTokens.ember,
+                            ),
+                          ),
                         ),
                       ),
-                    ],
-                  ),
+                  ],
                 ),
               ),
             ),
           ),
         )
-        .animate()
-        .fadeIn(delay: (28 * index).ms, duration: 320.ms)
-        .slideY(begin: 0.05, end: 0, curve: Curves.easeOutCubic)
-        .scale(
-          begin: const Offset(0.97, 0.97),
-          end: const Offset(1, 1),
-          delay: (28 * index).ms,
-          duration: 380.ms,
-          curve: Curves.easeOutCubic,
-        );
-  }
-}
-
-class _GlassChip extends StatelessWidget {
-  const _GlassChip({required this.child});
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(999),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-          decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.16),
-            borderRadius: BorderRadius.circular(999),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.28)),
-          ),
-          child: child,
-        ),
-      ),
+            .animate()
+            .fadeIn(delay: (28 * index).ms, duration: 320.ms)
+            .slideY(begin: 0.04, end: 0, curve: Curves.easeOutCubic);
+      },
     );
   }
 }
 
-class _OverlayIconButton extends StatelessWidget {
-  const _OverlayIconButton({required this.icon, this.onTap});
-  final IconData icon;
-  final VoidCallback? onTap;
+class _ListingTilePhoto extends StatelessWidget {
+  const _ListingTilePhoto({required this.photoUrls});
+
+  final List<String> photoUrls;
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap == null
-            ? null
-            : () {
-                HapticFeedback.selectionClick();
-                onTap!();
-              },
-        customBorder: const CircleBorder(),
-        child: Ink(
-          width: 40,
-          height: 40,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: Colors.white.withValues(alpha: 0.16),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.28)),
-          ),
-          child: Icon(icon, color: Colors.white, size: 20),
+    if (photoUrls.isEmpty) {
+      return const ColoredBox(
+        color: VelvetTokens.parchmentDeep,
+        child: Center(
+          child: Icon(Icons.person_outline, size: 36, color: Colors.white38),
         ),
-      ),
-    );
-  }
-}
-
-class _OverlayPrimaryIconButton extends StatelessWidget {
-  const _OverlayPrimaryIconButton({
-    required this.onTap,
-    required this.tooltip,
-    this.loading = false,
-  });
-
-  final VoidCallback? onTap;
-  final String tooltip;
-  final bool loading;
-
-  @override
-  Widget build(BuildContext context) {
-    return Tooltip(
-      message: tooltip,
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onTap == null
-              ? null
-              : () {
-                  HapticFeedback.mediumImpact();
-                  onTap!();
-                },
-          customBorder: const CircleBorder(),
-          child: Ink(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: VelvetTokens.ember,
-              boxShadow: VelvetTokens.emberHalo(strength: 0.55),
-            ),
-            child: loading
-                ? const Padding(
-                    padding: EdgeInsets.all(12),
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: VelvetTokens.onPrimary,
-                    ),
-                  )
-                : const Icon(
-                    Icons.favorite_rounded,
-                    color: VelvetTokens.onPrimary,
-                    size: 22,
-                  ),
-          ),
-        ),
+      );
+    }
+    return Image.network(
+      resolveMediaUrl(photoUrls.first),
+      fit: BoxFit.cover,
+      gaplessPlayback: true,
+      loadingBuilder: (context, child, progress) {
+        if (progress == null) return child;
+        return const ColoredBox(color: VelvetTokens.parchmentDeep);
+      },
+      errorBuilder: (_, _, _) => const ColoredBox(
+        color: VelvetTokens.parchmentDeep,
+        child: Icon(Icons.broken_image_outlined, color: Colors.white38),
       ),
     );
   }
@@ -642,25 +366,138 @@ class BookingRequestTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    final title = [
+      listing.name,
+      if (listing.age != null) '${listing.age}',
+    ].join(', ');
+    final radius = listingTileRadius(index);
+    final aspect = listingTileAspectRatio(index);
+    final subtitle = listing.subtitle ?? l10n.clientRequestHint;
 
-    return EditorialRequestCard(
-      index: index,
-      eyebrow: l10n.segmentRequests,
-      name: listing.name,
-      age: listing.age,
-      subtitle: listing.subtitle ?? l10n.clientRequestHint,
-      photoUrls: listing.photoUrls,
-      verified: listing.verified,
-      loading: loading,
-      acceptLabel: l10n.acceptRequest,
-      declineLabel: l10n.declineRequest,
-      onTap: () => showListingDetail(context, listing),
-      onAccept: onAccept,
-      onDecline: onDecline,
-    )
-        .animate()
-        .fadeIn(delay: (40 * index).ms, duration: 280.ms)
-        .slideY(begin: 0.04, end: 0);
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final width = constraints.maxWidth.isFinite
+            ? constraints.maxWidth
+            : MediaQuery.sizeOf(context).width / 2 - VelvetTokens.pageInset;
+        final height = width / aspect;
+        return SizedBox(
+          width: width,
+          height: height,
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: () => openListingDetail(
+                context,
+                listing,
+                actions: ListingDetailActions(
+                  primaryLabel: l10n.acceptRequest,
+                  onPrimary: onAccept,
+                  secondaryLabel: l10n.declineRequest,
+                  onSecondary: onDecline,
+                  loading: loading,
+                ),
+              ),
+              borderRadius: radius,
+              child: ClipRRect(
+                borderRadius: radius,
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    _ListingTilePhoto(photoUrls: listing.photoUrls),
+                    const DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            Color(0x33000000),
+                            Color(0x00000000),
+                            Color(0xCC000000),
+                          ],
+                          stops: [0, 0.4, 1],
+                        ),
+                      ),
+                    ),
+                    Positioned(
+                      top: 10,
+                      left: 10,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 5,
+                        ),
+                        decoration: BoxDecoration(
+                          color: VelvetTokens.ember,
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: Text(
+                          l10n.segmentRequests,
+                          style: GoogleFonts.dmSans(
+                            color: VelvetTokens.onPrimary,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 0.3,
+                          ),
+                        ),
+                      ),
+                    ),
+                    Positioned(
+                      left: 12,
+                      right: 12,
+                      bottom: 12,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.syne(
+                              color: Colors.white,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: -0.4,
+                            ),
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            subtitle,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.dmSans(
+                              color: Colors.white.withValues(alpha: 0.78),
+                              fontSize: 11.5,
+                              height: 1.3,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (loading)
+                      const ColoredBox(
+                        color: Color(0x66000000),
+                        child: Center(
+                          child: SizedBox(
+                            width: 22,
+                            height: 22,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: VelvetTokens.ember,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        )
+            .animate()
+            .fadeIn(delay: (28 * index).ms, duration: 320.ms)
+            .slideY(begin: 0.04, end: 0, curve: Curves.easeOutCubic);
+      },
+    );
   }
 }
 
@@ -681,60 +518,95 @@ class ConciergeIntroTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    return EditorialRequestCard(
-      index: index,
-      eyebrow: l10n.segmentIntros,
-      name: listing.name,
-      age: listing.age,
-      subtitle: listing.subtitle ?? l10n.clientRequestHint,
-      photoUrls: listing.photoUrls,
-      verified: listing.verified,
-      accent: VelvetTokens.plumSoft,
-      acceptLabel: l10n.acceptRequest,
-      declineLabel: l10n.declineRequest,
-      onTap: () => showListingDetail(context, listing),
-      onAccept: onAccept,
-      onDecline: onDecline,
+    final title = [
+      listing.name,
+      if (listing.age != null) '${listing.age}',
+    ].join(', ');
+    final note = listing.subtitle ?? l10n.clientRequestHint;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () => openListingDetail(
+          context,
+          listing,
+          actions: ListingDetailActions(
+            primaryLabel: l10n.acceptRequest,
+            onPrimary: onAccept,
+            secondaryLabel: l10n.declineRequest,
+            onSecondary: onDecline,
+          ),
+        ),
+        borderRadius: BorderRadius.circular(20),
+        child: Ink(
+          height: 112,
+          decoration: BoxDecoration(
+            color: VelvetTokens.parchmentLift,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: VelvetTokens.line.withValues(alpha: 0.7),
+            ),
+          ),
+          child: Row(
+            children: [
+              ClipRRect(
+                borderRadius: const BorderRadius.horizontal(
+                  left: Radius.circular(20),
+                ),
+                child: SizedBox(
+                  width: 88,
+                  height: 112,
+                  child: _ListingTilePhoto(photoUrls: listing.photoUrls),
+                ),
+              ),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        l10n.segmentIntros,
+                        style: GoogleFonts.dmSans(
+                          color: VelvetTokens.ember,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.6,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.syne(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: -0.4,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        note,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.dmSans(
+                          color: VelvetTokens.muted,
+                          fontSize: 13,
+                          height: 1.35,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     )
         .animate()
         .fadeIn(delay: (40 * index).ms, duration: 280.ms)
         .slideY(begin: 0.04, end: 0);
-  }
-}
-
-class _RateChip extends StatelessWidget {
-  const _RateChip({required this.label, this.icon});
-
-  final String label;
-  final IconData? icon;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: VelvetTheme.teal.withValues(alpha: 0.14),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: VelvetTheme.teal.withValues(alpha: 0.3)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (icon != null) ...[
-            Icon(icon, size: 14, color: VelvetTheme.champagne),
-            const SizedBox(width: 4),
-          ],
-          Flexible(
-            child: Text(
-              label,
-              style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                color: VelvetTheme.champagne,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
   }
 }

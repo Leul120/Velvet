@@ -114,20 +114,20 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
         }
       } catch (_) {}
 
-      // Restore the CBE checkout panel if there is a pending payment and we
-      // don't already have it in memory (e.g. after app resume or cold launch).
-      CheckoutResult? restoredCheckout = _checkout;
-      if (restoredCheckout == null &&
-          booking != null &&
-          (booking.paymentStatus == 'PENDING' ||
-              booking.paymentStatus == 'CHECKOUT')) {
+      // Always reload checkout from the API when payment is in progress — stale
+      // in-memory IDs cause "Unknown payment order" after an API restart.
+      CheckoutResult? restoredCheckout;
+      if (booking != null && booking.paymentStatus == 'PENDING') {
+        restoredCheckout = null;
         try {
           restoredCheckout = await ref
               .read(billingApiProvider)
               .pendingBookingPayment(booking.id);
         } catch (_) {
-          // Non-fatal: panel just won't show if the network call fails.
+          // Non-fatal: user can tap Pay again.
         }
+      } else {
+        restoredCheckout = null;
       }
 
       setState(() {
@@ -232,9 +232,35 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
     }
   }
 
+  Future<void> _handlePaymentProofError(Object e) async {
+    final code = apiErrorCode(e);
+    if (code == 'PAYMENT_NOT_FOUND' && mounted) {
+      setState(() => _checkout = null);
+      await _load();
+      showVelvetErrorToast(
+        context,
+        message:
+            'Payment session expired. Tap Pay booking again, then submit your receipt.',
+      );
+      return;
+    }
+    if (mounted) {
+      showVelvetErrorToast(context, message: apiErrorMessage(e));
+    }
+  }
+
   Future<void> _uploadBookingReceipt() async {
     final checkout = _checkout;
     if (checkout == null) return;
+    if (checkout.paymentIntentId.isEmpty) {
+      if (mounted) {
+        showVelvetErrorToast(
+          context,
+          message: 'Tap Pay booking first to start checkout.',
+        );
+      }
+      return;
+    }
     final l10n = AppLocalizations.of(context);
     final shot = await ImagePicker().pickImage(
       source: ImageSource.gallery,
@@ -272,9 +298,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
         await showVelvetToast(context, message: l10n.bookingPaid);
       }
     } catch (e) {
-      if (mounted) {
-        showVelvetErrorToast(context, message: apiErrorMessage(e));
-      }
+      await _handlePaymentProofError(e);
     } finally {
       if (mounted) setState(() => _actioning = false);
     }
@@ -283,6 +307,15 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
   Future<void> _enterBookingTransactionCode() async {
     final checkout = _checkout;
     if (checkout == null) return;
+    if (checkout.paymentIntentId.isEmpty) {
+      if (mounted) {
+        showVelvetErrorToast(
+          context,
+          message: 'Tap Pay booking first to start checkout.',
+        );
+      }
+      return;
+    }
     final reference = await showEditorialPrompt(
       context: context,
       title: 'Enter CBE transaction code',
@@ -312,9 +345,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
         );
       }
     } catch (e) {
-      if (mounted) {
-        showVelvetErrorToast(context, message: apiErrorMessage(e));
-      }
+      await _handlePaymentProofError(e);
     } finally {
       if (mounted) setState(() => _actioning = false);
     }

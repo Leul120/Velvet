@@ -2791,6 +2791,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Send discreet interest when a listing catches your eye — the conversation opens only after you both choose to connect.'**
   String get conversationsEmptyFlowHint;
+
+  /// No description provided for @listingSession.
+  ///
+  /// In en, this message translates to:
+  /// **'Session'**
+  String get listingSession;
+
+  /// No description provided for @listingOvernight.
+  ///
+  /// In en, this message translates to:
+  /// **'Overnight'**
+  String get listingOvernight;
+
+  /// No description provided for @listingAbout.
+  ///
+  /// In en, this message translates to:
+  /// **'Energy'**
+  String get listingAbout;
+
+  /// No description provided for @listingClose.
+  ///
+  /// In en, this message translates to:
+  /// **'Close'**
+  String get listingClose;
+
+  /// No description provided for @listingEtbAmount.
+  ///
+  /// In en, this message translates to:
+  /// **'{amount} ETB'**
+  String listingEtbAmount(int amount);
 }
 
 class _AppLocalizationsDelegate

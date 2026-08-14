@@ -237,7 +237,7 @@ public class DiscoverService {
     public DiscoverDtos.DiscoverFeedResponse recentPasses(UUID viewerId, int limit) {
         requireActiveSubscription(viewerId);
         requireCompleteProfile(viewerId);
-        int cap = Math.min(Math.max(limit, 1), 5);
+        int cap = Math.min(Math.max(limit, 1), 20);
         List<DiscoverDtos.DiscoverCard> items = new ArrayList<>();
         for (MemberLikeEntity like : likeRepository.findRecentPasses(viewerId)) {
             UserEntity target = userRepository.findById(like.getToUserId()).orElse(null);

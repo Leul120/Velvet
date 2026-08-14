@@ -322,23 +322,27 @@ class _MembershipScreenState extends ConsumerState<MembershipScreen> {
                     children: [
                       Text(
                         l10n.cbePayHint,
-                        style: GoogleFonts.inter(
-                          color: VelvetTheme.tealDeep,
+                        style: GoogleFonts.dmSans(
+                          color: context.velvet.muted,
                           fontWeight: FontWeight.w500,
                           fontSize: 13,
+                          height: 1.4,
                         ),
                       ),
                       if (_subscription != null) ...[
                         const SizedBox(height: 18),
-                        GlassPanel(
+                        _LiftCard(
                           padding: const EdgeInsets.all(18),
-                          fill: VelvetTheme.glassStrong,
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
                                 '${l10n.activePlan}: ${_subscription!.planNameEn}',
-                                style: Theme.of(context).textTheme.titleMedium,
+                                style: GoogleFonts.syne(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: -0.4,
+                                ),
                               ),
                               const SizedBox(height: 8),
                               StatusRibbon(status: _subscription!.status),
@@ -390,16 +394,17 @@ class _MembershipScreenState extends ConsumerState<MembershipScreen> {
                         ),
                       if (_subscription == null) ...[
                         const SizedBox(height: 8),
-                        GlassPanel(
+                        _LiftCard(
                           padding: const EdgeInsets.all(16),
-                          fill: VelvetTheme.glassFill,
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
                                 l10n.membershipPlanIncludes,
-                                style: Theme.of(context).textTheme.titleSmall
-                                    ?.copyWith(fontWeight: FontWeight.w700),
+                                style: GoogleFonts.syne(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 16,
+                                ),
                               ),
                               const SizedBox(height: 10),
                               _MembershipBenefit(
@@ -476,7 +481,7 @@ class _MembershipBenefit extends StatelessWidget {
           const Icon(
             Icons.check_circle_outline,
             size: 18,
-            color: VelvetTheme.teal,
+            color: VelvetTokens.ember,
           ),
           const SizedBox(width: 8),
           Expanded(
@@ -484,6 +489,27 @@ class _MembershipBenefit extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _LiftCard extends StatelessWidget {
+  const _LiftCard({required this.child, this.padding});
+
+  final Widget child;
+  final EdgeInsetsGeometry? padding;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.velvet;
+    return Container(
+      padding: padding,
+      decoration: BoxDecoration(
+        color: colors.parchmentLift,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: colors.line.withValues(alpha: 0.7)),
+      ),
+      child: child,
     );
   }
 }

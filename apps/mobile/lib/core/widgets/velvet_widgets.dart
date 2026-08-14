@@ -232,15 +232,15 @@ class _VelvetButtonState extends State<VelvetButton> {
 
     switch (widget.variant) {
       case VelvetButtonVariant.primary:
-        bg = VelvetTheme.teal;
-        fg = Colors.white;
+        bg = VelvetTokens.ember;
+        fg = VelvetTokens.onPrimary;
       case VelvetButtonVariant.secondary:
         bg = VelvetTheme.mistSlate.withValues(alpha: 0.1);
         fg = VelvetTheme.ink;
         side = null;
       case VelvetButtonVariant.ghost:
         bg = Colors.transparent;
-        fg = VelvetTheme.teal;
+        fg = VelvetTokens.ember;
         side = null;
       case VelvetButtonVariant.danger:
         bg = VelvetTheme.danger;
@@ -762,13 +762,14 @@ class VelvetSegmentedControl extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.velvet;
     return Container(
-      height: 38,
-      padding: const EdgeInsets.all(3),
+      height: 44,
+      padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
-        color: VelvetTheme.porcelain,
-        borderRadius: BorderRadius.circular(9),
-        border: Border.all(color: VelvetTheme.line),
+        color: colors.parchmentLift,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: colors.line.withValues(alpha: 0.7)),
       ),
       child: LayoutBuilder(
         builder: (context, constraints) {
@@ -777,7 +778,7 @@ class VelvetSegmentedControl extends StatelessWidget {
             clipBehavior: Clip.hardEdge,
             children: [
               AnimatedPositioned(
-                duration: const Duration(milliseconds: 200),
+                duration: const Duration(milliseconds: 220),
                 curve: Curves.easeOutCubic,
                 left: w * index,
                 top: 0,
@@ -785,21 +786,8 @@ class VelvetSegmentedControl extends StatelessWidget {
                 width: w,
                 child: Container(
                   decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(6),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.04),
-                        blurRadius: 1,
-                        spreadRadius: 0.5,
-                        offset: const Offset(0, 1),
-                      ),
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.12),
-                        blurRadius: 4,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
+                    color: VelvetTokens.ember,
+                    borderRadius: BorderRadius.circular(999),
                   ),
                 ),
               ),
@@ -819,14 +807,14 @@ class VelvetSegmentedControl extends StatelessWidget {
                         },
                         child: Center(
                           child: AnimatedDefaultTextStyle(
-                            duration: const Duration(milliseconds: 260),
-                            curve: Curves.fastOutSlowIn,
-                            style: GoogleFonts.inter(
+                            duration: const Duration(milliseconds: 200),
+                            curve: Curves.easeOutCubic,
+                            style: GoogleFonts.dmSans(
                               fontSize: 13,
-                              fontWeight: selected
-                                  ? FontWeight.w700
-                                  : FontWeight.w500,
-                              color: selected ? VelvetTheme.tealDeep : VelvetTheme.muted,
+                              fontWeight: FontWeight.w700,
+                              color: selected
+                                  ? VelvetTokens.onPrimary
+                                  : colors.muted,
                             ),
                             child: Text(
                               labels[i],
@@ -1133,12 +1121,18 @@ class VelvetEmptyState extends StatelessWidget {
 }
 
 class VelvetTrustedBadge extends StatelessWidget {
-  const VelvetTrustedBadge({super.key, this.compact = false});
+  const VelvetTrustedBadge({
+    super.key,
+    this.compact = false,
+    this.onDark = false,
+  });
 
   final bool compact;
+  final bool onDark;
 
   @override
   Widget build(BuildContext context) {
+    final accent = onDark ? VelvetTokens.ember : VelvetTheme.champagne;
     return Tooltip(
       message: 'Highly Trusted',
       child: Container(
@@ -1147,10 +1141,10 @@ class VelvetTrustedBadge extends StatelessWidget {
           vertical: compact ? 2 : 4,
         ),
         decoration: BoxDecoration(
-          color: VelvetTheme.champagne.withValues(alpha: 0.15),
+          color: accent.withValues(alpha: onDark ? 0.18 : 0.15),
           borderRadius: BorderRadius.circular(6),
           border: Border.all(
-            color: VelvetTheme.champagne.withValues(alpha: 0.3),
+            color: accent.withValues(alpha: onDark ? 0.4 : 0.3),
           ),
         ),
         child: Row(
@@ -1159,7 +1153,7 @@ class VelvetTrustedBadge extends StatelessWidget {
             Icon(
               Icons.workspace_premium,
               size: compact ? 12 : 14,
-              color: VelvetTheme.champagne,
+              color: accent,
             ),
             const SizedBox(width: 4),
             Text(
@@ -1167,7 +1161,7 @@ class VelvetTrustedBadge extends StatelessWidget {
               style: TextStyle(
                 fontSize: compact ? 10 : 11,
                 fontWeight: FontWeight.bold,
-                color: VelvetTheme.champagne,
+                color: accent,
               ),
             ),
           ],

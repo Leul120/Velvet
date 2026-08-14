@@ -18,12 +18,17 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.HandlerMapping;
 import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
 import java.util.UUID;
 
 @RestController
 @RequestMapping("/v1/media")
 public class MediaController {
+
+    private static final Logger log = LoggerFactory.getLogger(MediaController.class);
 
     private final ObjectStorageService storageService;
     private final MessageRepository messageRepository;
@@ -53,10 +58,21 @@ public class MediaController {
         }
         assertCanRead(key, principal);
 
-        ObjectStorageService.MediaStream media = storageService.open(key);
+        ObjectStorageService.MediaStream media;
+        try {
+            media = storageService.open(key);
+        } catch (BusinessException ex) {
+            if ("NOT_FOUND".equals(ex.getCode())) {
+                return ResponseEntity.notFound().build();
+            }
+            throw ex;
+        }
         StreamingResponseBody body = output -> {
             try (media) {
                 media.body().transferTo(output);
+            } catch (IOException ex) {
+                // Headers are already image/jpeg; do not rethrow or the JSON error mapper fails.
+                log.debug("Media stream ended early for {}: {}", key, ex.getMessage());
             }
         };
 

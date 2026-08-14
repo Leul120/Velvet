@@ -196,7 +196,7 @@ class DiscoverApi {
   DiscoverApi(this._dio);
   final Dio _dio;
 
-  Future<DiscoverFeed> feed({int limit = 20}) async {
+  Future<DiscoverFeed> feed({int limit = 50}) async {
     final res = await _dio.get(
       '/v1/discover',
       queryParameters: {'limit': limit},
@@ -204,7 +204,7 @@ class DiscoverApi {
     return DiscoverFeed.fromJson(res.data as Map<String, dynamic>);
   }
 
-  Future<DiscoverFeed> received({int limit = 20}) async {
+  Future<DiscoverFeed> received({int limit = 50}) async {
     final res = await _dio.get(
       '/v1/discover/received',
       queryParameters: {'limit': limit},
@@ -212,7 +212,7 @@ class DiscoverApi {
     return DiscoverFeed.fromJson(res.data as Map<String, dynamic>);
   }
 
-  Future<DiscoverFeed> recentPasses({int limit = 5}) async {
+  Future<DiscoverFeed> recentPasses({int limit = 20}) async {
     final res = await _dio.get(
       '/v1/discover/passes',
       queryParameters: {'limit': limit},

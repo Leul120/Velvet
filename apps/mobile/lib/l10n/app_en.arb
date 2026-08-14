@@ -536,5 +536,15 @@
   "flowHintRequest": "Request",
   "flowHintBook": "Book",
   "flowHintRespond": "Respond",
-  "conversationsEmptyFlowHint": "Send discreet interest when a listing catches your eye — the conversation opens only after you both choose to connect."
+  "conversationsEmptyFlowHint": "Send discreet interest when a listing catches your eye — the conversation opens only after you both choose to connect.",
+  "listingSession": "Session",
+  "listingOvernight": "Overnight",
+  "listingAbout": "Energy",
+  "listingClose": "Close",
+  "listingEtbAmount": "{amount} ETB",
+  "@listingEtbAmount": {
+    "placeholders": {
+      "amount": { "type": "int" }
+    }
+  }
 }

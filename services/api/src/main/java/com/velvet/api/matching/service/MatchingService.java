@@ -383,7 +383,9 @@ public class MatchingService {
         return bookingRepository.findByConnectionId(matchId)
                 .filter(b -> b.getStatus() == BookingStatus.COMPLETED)
                 .map(b -> {
-                    String name = venueRepository.findById(b.getVenueId()).map(VenueEntity::getName).orElse(null);
+                    String name = b.getVenueId() == null
+                            ? null
+                            : venueRepository.findById(b.getVenueId()).map(VenueEntity::getName).orElse(null);
                     return new MeetingInfo(true, name);
                 })
                 .orElse(new MeetingInfo(false, null));

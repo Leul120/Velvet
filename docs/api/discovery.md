@@ -45,12 +45,12 @@ Connection cards include `counterpartPhotoUrls`, `counterpartAge`, `counterpartC
 
 Local Docker sets `VELVET_SEED_RESET=true`. On each API start the demo roster is **wiped and reloaded** from `db/seed/demo_roster.sql` (not a one-shot Flyway migration).
 
-Invite `VELVET-SEED`. Elite + legal accepted. Unsplash portraits + Addis lat/lng.
+Invite `VELVET-SEED`. Elite + legal accepted. Photos approved so listings appear in Browse.
 
-| Phone | Name | Gender | Notes |
-|-------|------|--------|-------|
-| `+251911100001`–`012` | Abel … Tedros (12) | MALE | Nearby browse; Abel mutual with Sara |
-| `+251911200001`–`018` | Sara … Yordanos (18) | FEMALE | Likes-you queues prefilled |
+| Phone | Name | Role | Notes |
+|-------|------|------|-------|
+| `+251911100001`–`024` | Abel … Yared (24) | CLIENT | Abel has a packed inbox, intros, bookings, history, passes, and browse grid |
+| `+251911200001`–`060` | Sara … Birtukan (60) | PERFORMER | Request inboxes prefilled; last listing (Birtukan) pending verification |
 | Admin | `+251911000000` | — | Staff portal / web `/admin` |
 
 Disable with `VELVET_SEED_RESET=false` (required in production).

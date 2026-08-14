@@ -33,3 +33,6 @@ apps/mobile/.android/
 
 # Logs
 *.log
+
+# Generated demo photo manifest (reproducible via seed_demo_photos.py)
+services/api/scripts/demo_photo_manifest.json

@@ -6,7 +6,6 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:velvet_mobile/core/network/dio_client.dart';
 import 'package:velvet_mobile/core/network/media_url.dart';
-import 'package:velvet_mobile/core/theme/velvet_theme.dart';
 import 'package:velvet_mobile/core/theme/velvet_editorial_colors.dart';
 import 'package:velvet_mobile/core/theme/velvet_tokens.dart';
 import 'package:velvet_mobile/core/widgets/kinetic_text.dart';
@@ -117,6 +116,7 @@ class _ConnectionConfirmedScreenState
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final locale = Localizations.localeOf(context).languageCode;
+    final colors = context.velvet;
     final booking = _booking;
     final needsPay = booking?.needsPayment == true;
     final isConfirmed =
@@ -132,69 +132,48 @@ class _ConnectionConfirmedScreenState
       mistIntensity: 1.0,
       body: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
+          padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              Center(
+                child: _avatar(widget.counterpartPhoto),
+              ).animate().fadeIn(duration: 320.ms).slideY(begin: 0.04, end: 0),
+              const SizedBox(height: 16),
+              Text(
+                widget.counterpartName ?? l10n.someoneLabel,
+                textAlign: TextAlign.center,
+                style: GoogleFonts.syne(
+                  fontSize: 28,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -0.7,
+                  height: 1.0,
+                  color: colors.ink,
+                ),
+              ),
+              const SizedBox(height: 8),
               Text(
                 l10n.connectionConfirmedTitle,
                 textAlign: TextAlign.center,
-                style: GoogleFonts.syne(
-                  fontSize: VelvetTokens.displayMedium,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: -1.0,
-                  color: VelvetTokens.gold,
-                  height: 0.95,
+                style: GoogleFonts.dmSans(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.6,
+                  color: VelvetTokens.ember,
                 ),
-              ).animate().fadeIn(duration: 360.ms).slideY(begin: 0.06, end: 0),
+              ),
               const SizedBox(height: 8),
               Text(
                 widget.counterpartName == null
                     ? l10n.connectionConfirmedBody
                     : l10n.connectionConfirmedWith(widget.counterpartName!),
                 textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  color: context.velvet.muted,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: colors.muted,
                   height: 1.4,
                 ),
-              ).animate().fadeIn(delay: 60.ms, duration: 320.ms),
-              const SizedBox(height: 24),
-              GlassPanel(
-                padding: const EdgeInsets.all(16),
-                fill: VelvetTheme.glassStrong,
-                child: Row(
-                  children: [
-                    _avatar(widget.counterpartPhoto),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            widget.counterpartName ?? l10n.someoneLabel,
-                            style: GoogleFonts.syne(
-                              fontSize: 28,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: -0.6,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            l10n.connectionConfirmedNext,
-                            style: Theme.of(context).textTheme.bodySmall
-                                ?.copyWith(color: context.velvet.muted),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const Icon(
-                      Icons.verified_user_outlined,
-                      color: VelvetTheme.teal,
-                    ),
-                  ],
-                ),
-              ).animate().fadeIn(delay: 100.ms).slideY(begin: 0.05, end: 0),
-              const SizedBox(height: 14),
+              ),
+              const SizedBox(height: 20),
               _NextBestActionCard(
                 booking: booking,
                 loading: _bookingLoading,
@@ -203,11 +182,16 @@ class _ConnectionConfirmedScreenState
               ),
               if (!isConfirmed) ...[
                 const SizedBox(height: 8),
-                VelvetButton(
-                  label: l10n.openChat,
-                  variant: VelvetButtonVariant.secondary,
-                  icon: Icons.chat_bubble_outline_rounded,
+                OutlinedButton.icon(
                   onPressed: _openChat,
+                  icon: const Icon(Icons.chat_bubble_outline_rounded, size: 18),
+                  label: Text(l10n.openChat),
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size.fromHeight(50),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                  ),
                 ),
               ],
               if (_suggestedOpeners.isNotEmpty) ...[
@@ -230,8 +214,7 @@ class _ConnectionConfirmedScreenState
                       final text = locale == 'am' ? ice.textAm : ice.textEn;
                       final selected =
                           _selected == ice.textEn || _selected == ice.textAm;
-                      final colors = context.velvet;
-                      final radius = BorderRadius.circular(VelvetTokens.radiusMd);
+                      final radius = BorderRadius.circular(18);
 
                       return Material(
                         color: Colors.transparent,
@@ -250,18 +233,19 @@ class _ConnectionConfirmedScreenState
                             ),
                             decoration: BoxDecoration(
                               color: selected
-                                  ? VelvetTokens.ember.withValues(alpha: 0.08)
+                                  ? VelvetTokens.ember.withValues(alpha: 0.10)
                                   : colors.parchmentLift,
                               borderRadius: radius,
                               border: Border.all(
                                 color: selected
                                     ? VelvetTokens.ember.withValues(alpha: 0.4)
-                                    : colors.line.withValues(alpha: 0.85),
+                                    : colors.line.withValues(alpha: 0.7),
                               ),
                             ),
                             child: Text(
                               text,
-                              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              style: Theme.of(context).textTheme.bodyMedium
+                                  ?.copyWith(
                                     height: 1.4,
                                     fontWeight: selected
                                         ? FontWeight.w600
@@ -275,19 +259,32 @@ class _ConnectionConfirmedScreenState
                     },
                   ),
                 ),
-                VelvetButton(
-                  label: l10n.sendOpener,
-                  icon: Icons.send_rounded,
-                  loading: _sending,
+                FilledButton.icon(
                   onPressed: _sending ? null : _sendOpener,
+                  icon: _sending
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: VelvetTokens.onPrimary,
+                          ),
+                        )
+                      : const Icon(Icons.send_rounded, size: 18),
+                  label: Text(l10n.sendOpener),
+                  style: FilledButton.styleFrom(
+                    minimumSize: const Size.fromHeight(52),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                  ),
                 ),
               ] else if (!isConfirmed)
                 const Spacer(),
               const SizedBox(height: 8),
-              VelvetButton(
-                label: l10n.keepBrowsing,
-                variant: VelvetButtonVariant.ghost,
+              TextButton(
                 onPressed: () => context.go('/discover'),
+                child: Text(l10n.keepBrowsing),
               ),
             ],
           ),
@@ -298,21 +295,21 @@ class _ConnectionConfirmedScreenState
 
   Widget _avatar(String? url) {
     return ClipRRect(
-      borderRadius: BorderRadius.circular(VelvetTheme.radiusMd),
+      borderRadius: BorderRadius.circular(20),
       child: SizedBox(
-        width: 64,
-        height: 64,
+        width: 112,
+        height: 140,
         child: url == null
-            ? Container(
-                color: VelvetTheme.mistSage,
-                child: const Icon(Icons.person_outline, size: 28),
+            ? ColoredBox(
+                color: VelvetTokens.parchmentLift,
+                child: const Icon(Icons.person_outline, size: 40),
               )
             : Image.network(
                 resolveMediaUrl(url),
                 fit: BoxFit.cover,
-                errorBuilder: (_, _, _) => Container(
-                  color: VelvetTheme.mistSage,
-                  child: const Icon(Icons.person_outline, size: 28),
+                errorBuilder: (_, _, _) => ColoredBox(
+                  color: VelvetTokens.parchmentLift,
+                  child: const Icon(Icons.person_outline, size: 40),
                 ),
               ),
       ),
@@ -336,11 +333,16 @@ class _NextBestActionCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    final colors = context.velvet;
     if (loading) {
-      return const GlassPanel(
-        padding: EdgeInsets.all(14),
-        fill: VelvetTheme.glassFill,
-        child: LinearProgressIndicator(minHeight: 2),
+      return Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: colors.parchmentLift,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: colors.line.withValues(alpha: 0.7)),
+        ),
+        child: const LinearProgressIndicator(minHeight: 2),
       );
     }
     final b = booking;
@@ -379,10 +381,13 @@ class _NextBestActionCard extends StatelessWidget {
         ? onOpenBooking
         : onOpenChat;
 
-    return GlassPanel(
+    return Container(
       padding: const EdgeInsets.all(16),
-      fill: VelvetTheme.glassStrong,
-      border: VelvetTheme.teal.withValues(alpha: 0.28),
+      decoration: BoxDecoration(
+        color: colors.parchmentLift,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: colors.line.withValues(alpha: 0.7)),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -394,11 +399,8 @@ class _NextBestActionCard extends StatelessWidget {
                 height: 38,
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: VelvetTheme.teal.withValues(alpha: 0.16),
-                  border: Border.all(
-                    color: VelvetTheme.champagne.withValues(alpha: 0.34),
-                  ),
+                  color: VelvetTokens.ember.withValues(alpha: 0.14),
+                  borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(
                   requiresPay
@@ -406,7 +408,7 @@ class _NextBestActionCard extends StatelessWidget {
                       : confirmed
                       ? Icons.forum_outlined
                       : Icons.event_available_rounded,
-                  color: VelvetTheme.champagne,
+                  color: VelvetTokens.ember,
                   size: 19,
                 ),
               ),
@@ -417,35 +419,36 @@ class _NextBestActionCard extends StatelessWidget {
                   children: [
                     Text(
                       title,
-                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      style: GoogleFonts.syne(
+                        fontSize: 16,
                         fontWeight: FontWeight.w700,
+                        letterSpacing: -0.3,
                       ),
                     ),
                     const SizedBox(height: 2),
                     Text(
                       body,
-                      style: Theme.of(
-                        context,
-                      ).textTheme.bodySmall?.copyWith(color: context.velvet.muted),
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: colors.muted,
+                        height: 1.4,
+                      ),
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 8),
                     Container(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 8,
                         vertical: 4,
                       ),
                       decoration: BoxDecoration(
-                        color: VelvetTheme.teal.withValues(alpha: 0.16),
+                        color: VelvetTokens.ember.withValues(alpha: 0.14),
                         borderRadius: BorderRadius.circular(999),
-                        border: Border.all(
-                          color: VelvetTheme.teal.withValues(alpha: 0.35),
-                        ),
                       ),
                       child: Text(
                         badge,
-                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                          color: VelvetTheme.champagne,
-                          fontWeight: FontWeight.w600,
+                        style: GoogleFonts.dmSans(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: VelvetTokens.ember,
                         ),
                       ),
                     ),
@@ -455,12 +458,21 @@ class _NextBestActionCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 14),
-          VelvetButton(
-            label: cta,
-            icon: requiresPay || (hasProposal && !confirmed)
-                ? Icons.calendar_month_outlined
-                : Icons.chat_bubble_outline_rounded,
+          FilledButton.icon(
             onPressed: action,
+            icon: Icon(
+              requiresPay || (hasProposal && !confirmed)
+                  ? Icons.calendar_month_outlined
+                  : Icons.chat_bubble_outline_rounded,
+              size: 18,
+            ),
+            label: Text(cta),
+            style: FilledButton.styleFrom(
+              minimumSize: const Size.fromHeight(50),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(999),
+              ),
+            ),
           ),
         ],
       ),

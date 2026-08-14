@@ -101,57 +101,33 @@ class _VelvetCardSurface extends StatelessWidget {
 }
 
 class _AvatarThumb extends StatelessWidget {
-  const _AvatarThumb({
-    required this.photoUrl,
-    this.badge,
-    this.featured = false,
-  });
+  const _AvatarThumb({required this.photoUrl});
 
   final String? photoUrl;
-  final Widget? badge;
-  final bool featured;
 
   @override
   Widget build(BuildContext context) {
     final colors = context.velvet;
-    final size = featured ? 64.0 : 56.0;
-    return Stack(
-      clipBehavior: Clip.none,
-      children: [
-        Container(
-          width: size,
-          height: size,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            border: Border.all(
-              color: featured
-                  ? VelvetTokens.ember.withValues(alpha: 0.35)
-                  : colors.line.withValues(alpha: 0.7),
-              width: featured ? 2 : 1.2,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: colors.ink.withValues(alpha: 0.08),
-                blurRadius: 12,
-                offset: const Offset(0, 4),
+    const size = 56.0;
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        border: Border.all(color: colors.line.withValues(alpha: 0.7)),
+      ),
+      child: ClipOval(
+        child: photoUrl != null
+            ? Image.network(photoUrl!, fit: BoxFit.cover)
+            : ColoredBox(
+                color: colors.parchmentDeep,
+                child: Icon(
+                  Icons.person_outline,
+                  color: colors.muted,
+                  size: size * 0.4,
+                ),
               ),
-            ],
-          ),
-          child: ClipOval(
-            child: photoUrl != null
-                ? Image.network(photoUrl!, fit: BoxFit.cover)
-                : ColoredBox(
-                    color: colors.parchmentDeep,
-                    child: Icon(
-                      Icons.person_outline,
-                      color: colors.muted,
-                      size: size * 0.4,
-                    ),
-                  ),
-          ),
-        ),
-        if (badge != null) Positioned(right: -2, top: -2, child: badge!),
-      ],
+      ),
     );
   }
 }
@@ -193,39 +169,33 @@ class EditorialInboxCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.velvet;
     final active = yourTurn || unreadCount > 0;
+    final _ = (index, onOpenChat, replyLabel);
 
     return _VelvetCardSurface(
       onTap: onTap,
       highlighted: active,
-      padding: const EdgeInsets.all(VelvetTokens.space16),
+      padding: const EdgeInsets.all(12),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _AvatarThumb(
-            photoUrl: photoUrl,
-            featured: active,
-            badge: unreadCount > 0
-                ? Container(
-                    constraints: const BoxConstraints(minWidth: 20),
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: VelvetTokens.ember,
-                      borderRadius: BorderRadius.circular(VelvetTokens.radiusPill),
-                      boxShadow: VelvetTokens.emberHalo(strength: 0.4),
-                    ),
-                    child: Text(
-                      unreadCount > 9 ? '9+' : '$unreadCount',
-                      textAlign: TextAlign.center,
-                      style: GoogleFonts.dmSans(
-                        color: Colors.white,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
+          ClipRRect(
+            borderRadius: BorderRadius.circular(14),
+            child: SizedBox(
+              width: 64,
+              height: 80,
+              child: photoUrl != null
+                  ? Image.network(photoUrl!, fit: BoxFit.cover)
+                  : ColoredBox(
+                      color: colors.parchmentDeep,
+                      child: Icon(
+                        Icons.person_outline,
+                        color: colors.muted,
+                        size: 28,
                       ),
                     ),
-                  )
-                : null,
+            ),
           ),
-          const SizedBox(width: VelvetTokens.space12),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -238,38 +208,20 @@ class EditorialInboxCard extends StatelessWidget {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: GoogleFonts.syne(
-                          fontSize: 18,
+                          fontSize: 17,
                           fontWeight: FontWeight.w700,
-                          letterSpacing: -0.4,
+                          letterSpacing: -0.3,
                           color: colors.ink,
                         ),
                       ),
                     ),
-                    if (yourTurn)
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 5,
-                        ),
-                        decoration: BoxDecoration(
-                          color: VelvetTokens.ember.withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(999),
-                        ),
-                        child: Text(
-                          turnLabel,
-                          style: GoogleFonts.dmSans(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700,
-                            color: VelvetTokens.emberDeep,
-                          ),
-                        ),
+                    if (verified)
+                      const Padding(
+                        padding: EdgeInsets.only(left: 6),
+                        child: VelvetVerifiedBadge(compact: true),
                       ),
                   ],
                 ),
-                if (verified) ...[
-                  const SizedBox(height: 4),
-                  const VelvetVerifiedBadge(compact: true),
-                ],
                 const SizedBox(height: 6),
                 Text(
                   preview,
@@ -279,101 +231,74 @@ class EditorialInboxCard extends StatelessWidget {
                     fontSize: 14,
                     height: 1.4,
                     color: active ? colors.ink : colors.muted,
-                    fontWeight: unreadCount > 0 ? FontWeight.w600 : FontWeight.w400,
+                    fontWeight: unreadCount > 0
+                        ? FontWeight.w600
+                        : FontWeight.w400,
                   ),
                 ),
-                const SizedBox(height: VelvetTokens.space12),
-                Row(
-                  children: [
-                    _SoftActionChip(
-                      label: yourTurn ? replyLabel : openChatLabel,
-                      icon: yourTurn ? Icons.reply_rounded : Icons.forum_outlined,
-                      primary: yourTurn,
-                      onTap: onOpenChat,
+                if (yourTurn) ...[
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 5,
                     ),
-                    const SizedBox(width: 8),
-                    _SoftActionChip(
-                      label: '',
-                      icon: Icons.calendar_month_outlined,
-                      primary: false,
-                      iconOnly: true,
-                      onTap: onBook,
+                    decoration: BoxDecoration(
+                      color: VelvetTokens.ember.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(999),
                     ),
-                  ],
-                ),
+                    child: Text(
+                      turnLabel,
+                      style: GoogleFonts.dmSans(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: VelvetTokens.ember,
+                      ),
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SoftActionChip extends StatelessWidget {
-  const _SoftActionChip({
-    required this.label,
-    required this.icon,
-    required this.primary,
-    required this.onTap,
-    this.iconOnly = false,
-  });
-
-  final String label;
-  final IconData icon;
-  final bool primary;
-  final bool iconOnly;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.velvet;
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: () {
-          HapticFeedback.selectionClick();
-          onTap();
-        },
-        borderRadius: BorderRadius.circular(999),
-        child: Ink(
-          padding: EdgeInsets.symmetric(
-            horizontal: iconOnly ? 10 : 14,
-            vertical: 9,
-          ),
-          decoration: BoxDecoration(
-            color: primary
-                ? VelvetTokens.ember.withValues(alpha: 0.12)
-                : colors.parchmentDeep.withValues(alpha: 0.75),
-            borderRadius: BorderRadius.circular(999),
-            border: Border.all(
-              color: primary
-                  ? VelvetTokens.ember.withValues(alpha: 0.28)
-                  : colors.line.withValues(alpha: 0.55),
-            ),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
+          const SizedBox(width: 8),
+          Column(
             children: [
-              Icon(
-                icon,
-                size: 16,
-                color: primary ? VelvetTokens.emberDeep : colors.ink,
-              ),
-              if (!iconOnly) ...[
-                const SizedBox(width: 6),
-                Text(
-                  label,
-                  style: GoogleFonts.dmSans(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 13,
-                    color: primary ? VelvetTokens.emberDeep : colors.ink,
+              if (unreadCount > 0)
+                Container(
+                  constraints: const BoxConstraints(minWidth: 22),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 7,
+                    vertical: 3,
+                  ),
+                  decoration: BoxDecoration(
+                    color: VelvetTokens.ember,
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(
+                    unreadCount > 9 ? '9+' : '$unreadCount',
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.dmSans(
+                      color: VelvetTokens.onPrimary,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                    ),
                   ),
                 ),
-              ],
+              IconButton(
+                tooltip: openChatLabel,
+                onPressed: () {
+                  HapticFeedback.selectionClick();
+                  onBook();
+                },
+                icon: Icon(
+                  Icons.calendar_month_outlined,
+                  color: colors.muted,
+                  size: 20,
+                ),
+              ),
             ],
           ),
-        ),
+        ],
       ),
     );
   }
@@ -382,7 +307,7 @@ class _SoftActionChip extends StatelessWidget {
 enum EditorialNoticeKind { match, booking, reminder, general }
 
 double _requestCardAspect(int index) {
-  const ratios = [0.58, 0.78, 0.68, 0.88, 0.62, 0.74, 0.92, 0.66];
+  const ratios = [0.52, 0.84, 0.62, 0.96, 0.56, 0.74, 0.90, 0.60];
   return ratios[index % ratios.length];
 }
 

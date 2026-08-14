@@ -2,12 +2,16 @@ package com.velvet.api.billing.cbe;
 
 import com.velvet.api.common.api.BusinessException;
 import com.velvet.api.common.config.VelvetProperties;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.text.PDFTextStripper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.io.ByteArrayResource;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
+import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.http.client.MultipartBodyBuilder;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
@@ -16,7 +20,19 @@ import org.springframework.web.client.RestClient;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.multipart.MultipartFile;
 
+import javax.net.ssl.HttpsURLConnection;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.TrustManager;
+import javax.net.ssl.X509TrustManager;
+import java.io.IOException;
+import java.io.InputStream;
 import java.math.BigDecimal;
+import java.net.HttpURLConnection;
+import java.net.SocketTimeoutException;
+import java.net.http.HttpClient;
+import java.nio.charset.StandardCharsets;
+import java.security.SecureRandom;
+import java.security.cert.X509Certificate;
 import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -40,15 +56,23 @@ public class CbeVerifierClient {
 
     private final VelvetProperties properties;
     private final RestClient restClient;
+    private final RestClient cbeReceiptClient;
 
     public CbeVerifierClient(VelvetProperties properties) {
         this.properties = properties;
-        // The mobile app should receive a clear provider-outage result rather
-        // than exhaust its own request timeout while a verifier is unhealthy.
-        SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
-        requestFactory.setConnectTimeout(Duration.ofSeconds(8));
-        requestFactory.setReadTimeout(Duration.ofSeconds(12));
+        // Hosted verifier scrapes CBE with Puppeteer; receipts often take 20–45s.
+        HttpClient httpClient = HttpClient.newBuilder()
+                .connectTimeout(Duration.ofSeconds(15))
+                .build();
+        JdkClientHttpRequestFactory requestFactory = new JdkClientHttpRequestFactory(httpClient);
+        requestFactory.setReadTimeout(Duration.ofSeconds(60));
         this.restClient = RestClient.builder().requestFactory(requestFactory).build();
+
+        // CBE's public receipt host often presents a cert Java will not trust.
+        CbeReceiptRequestFactory cbeFactory = new CbeReceiptRequestFactory();
+        cbeFactory.setConnectTimeout(Duration.ofSeconds(15));
+        cbeFactory.setReadTimeout(Duration.ofSeconds(30));
+        this.cbeReceiptClient = RestClient.builder().requestFactory(cbeFactory).build();
     }
 
     public record VerificationResult(
@@ -140,23 +164,207 @@ public class CbeVerifierClient {
         }
         VelvetProperties.CbeVerifier cfg = requireCfg();
         try {
-            @SuppressWarnings("unchecked")
-            Map<String, Object> response = restClient.post()
+            return verifyLiveReference(exactReference, accountSuffix, cfg);
+        } catch (BusinessException live) {
+            if (shouldFallbackToDirect(live)) {
+                log.warn("Live CBE verifier unavailable ({}), trying CBE public receipt", live.getCode());
+                try {
+                    VerificationResult direct = verifyDirectCbeReceipt(exactReference, accountSuffix);
+                    if (direct.success()) {
+                        return direct;
+                    }
+                    log.warn("CBE public receipt did not confirm FT {}", exactReference);
+                } catch (BusinessException direct) {
+                    log.warn("CBE public receipt fallback failed: {} {}", direct.getCode(), direct.getMessage());
+                    if ("CBE_VERIFY_REJECTED".equals(direct.getCode()) || "CBE_VERIFY_EMPTY".equals(direct.getCode())) {
+                        throw direct;
+                    }
+                }
+            }
+            throw live;
+        } catch (Exception e) {
+            throw verifierFailure(e, "reference");
+        }
+    }
+
+    private record RawHttpResponse(HttpStatusCode status, HttpHeaders headers, byte[] body) {}
+
+    private VerificationResult verifyLiveReference(
+            String exactReference,
+            String accountSuffix,
+            VelvetProperties.CbeVerifier cfg
+    ) {
+        try {
+            RawHttpResponse response = restClient.post()
                     .uri(base(cfg) + "/verify-cbe")
                     .header("x-api-key", cfg.apiKey())
+                    .header("Accept", "application/json, application/pdf, application/octet-stream")
                     .contentType(MediaType.APPLICATION_JSON)
                     .body(Map.of(
                             "reference", exactReference,
                             "accountSuffix", accountSuffix.trim()
                     ))
-                    .retrieve()
-                    .body(Map.class);
-            return parse(response);
+                    .exchange(this::readRawResponse);
+            if (response.status().isError()) {
+                throw mapVerifierHttpError(response.status(), response.body());
+            }
+            if (response.body().length == 0) {
+                throw new BusinessException("CBE_VERIFY_EMPTY", "Empty response from CBE verifier.");
+            }
+            return decodeVerifierBody(response.body(), response.headers().getContentType(), exactReference);
         } catch (BusinessException e) {
             throw e;
+        } catch (HttpClientErrorException clientError) {
+            throw mapVerifierHttpError(clientError.getStatusCode(), clientError.getResponseBodyAsByteArray());
         } catch (Exception e) {
             throw verifierFailure(e, "reference");
         }
+    }
+
+    private RawHttpResponse readRawResponse(
+            org.springframework.http.HttpRequest request,
+            RestClient.RequestHeadersSpec.ConvertibleClientHttpResponse response
+    ) throws IOException {
+        HttpStatusCode status = response.getStatusCode();
+        HttpHeaders headers = response.getHeaders();
+        try {
+            byte[] body = readBodyBytes(response);
+            return new RawHttpResponse(status, headers, body);
+        } catch (BusinessException e) {
+            throw e;
+        } catch (Exception e) {
+            log.warn("CBE verifier response read failed status={} type={}: {}",
+                    status, headers.getContentType(), e.toString());
+            throw verifierFailure(e, "reference");
+        }
+    }
+
+    private static byte[] readBodyBytes(
+            RestClient.RequestHeadersSpec.ConvertibleClientHttpResponse response
+    ) throws IOException {
+        try (InputStream in = response.getBody()) {
+            return in.readAllBytes();
+        } catch (IOException e) {
+            // 4xx/5xx bodies can still be missing after a transport reset.
+            if (response.getStatusCode().isError()) {
+                return new byte[0];
+            }
+            throw e;
+        }
+    }
+
+    static VerificationResult decodeVerifierBody(byte[] body, MediaType contentType, String exactReference) {
+        if (looksLikePdf(contentType, body)) {
+            return parseDirectPdf(body, exactReference);
+        }
+        try {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> json = new ObjectMapper().readValue(body, Map.class);
+            Object err = json.get("error");
+            if (Boolean.FALSE.equals(json.get("success")) && err != null && !err.toString().isBlank()) {
+                String message = err.toString();
+                if (message.toLowerCase().contains("api key")) {
+                    throw new BusinessException("CBE_VERIFIER_CONFIG", "CBE verifier API key was rejected.");
+                }
+                throw new BusinessException("CBE_VERIFY_REJECTED", message);
+            }
+            return parse(json);
+        } catch (BusinessException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new BusinessException("CBE_VERIFY_REJECTED", "CBE verifier returned an unreadable response.");
+        }
+    }
+
+    private static boolean looksLikePdf(MediaType contentType, byte[] body) {
+        if (body.length < 4 || body[0] != '%' || body[1] != 'P' || body[2] != 'D' || body[3] != 'F') {
+            return false;
+        }
+        if (contentType == null) {
+            return true;
+        }
+        return MediaType.APPLICATION_PDF.includes(contentType)
+                || MediaType.APPLICATION_OCTET_STREAM.includes(contentType);
+    }
+
+    /**
+     * 422 from verifier-api means the receipt could not be verified (missing PDF,
+     * unknown FT code, wrong suffix). That is not the same as Chrome/Puppeteer being down.
+     */
+    static BusinessException mapVerifierHttpError(HttpStatusCode status, byte[] body) {
+        String raw = body == null ? "" : new String(body, StandardCharsets.UTF_8);
+        String errorText = extractVerifierErrorMessage(raw);
+
+        if (errorText != null && errorText.toLowerCase().contains("api key")) {
+            return new BusinessException("CBE_VERIFIER_CONFIG", "CBE verifier API key was rejected.");
+        }
+        if (isVerifierInfrastructureFailure(status, errorText)) {
+            log.warn("CBE verifier service is unhealthy: {} {}", status, abbreviate(errorText));
+            return new BusinessException(
+                    "CBE_VERIFIER_UNAVAILABLE",
+                    "CBE verification is temporarily unavailable. Please try again shortly."
+            );
+        }
+        log.warn("CBE verifier rejected proof: {} {}", status, abbreviate(errorText));
+        return new BusinessException("CBE_VERIFY_REJECTED", userFacingVerifierRejection(errorText));
+    }
+
+    private static String extractVerifierErrorMessage(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return null;
+        }
+        try {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> json = new ObjectMapper().readValue(raw, Map.class);
+            Object err = json.get("error");
+            if (err != null && !err.toString().isBlank()) {
+                return err.toString().trim();
+            }
+            Object message = json.get("message");
+            if (message != null && !message.toString().isBlank()) {
+                return message.toString().trim();
+            }
+        } catch (Exception ignored) {
+            // plain-text verifier errors still surface to the member
+        }
+        String trimmed = raw.trim();
+        return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    private static boolean isVerifierInfrastructureFailure(HttpStatusCode status, String errorText) {
+        if (status != null && status.is5xxServerError()) {
+            return true;
+        }
+        if (errorText == null) {
+            return false;
+        }
+        String lower = errorText.toLowerCase();
+        return lower.contains("could not find chrome")
+                || lower.contains("failed to launch")
+                || lower.contains("executable doesn't exist");
+    }
+
+    private static String userFacingVerifierRejection(String errorText) {
+        if (errorText == null || errorText.isBlank()) {
+            return "CBE could not verify this transfer. Check the FT code and try again.";
+        }
+        String lower = errorText.toLowerCase();
+        if (lower.contains("pdf") || lower.contains("puppeteer") || lower.contains("not found")
+                || lower.contains("invalid") || lower.contains("expired")) {
+            return "CBE could not find this transfer. Confirm the 12-character FT code and that you paid the VELVET CBE account.";
+        }
+        if (errorText.length() < 160 && !lower.contains("stack") && !lower.contains(" at ")) {
+            return errorText;
+        }
+        return "CBE could not verify this transfer. Check the FT code and try again.";
+    }
+
+    private static String abbreviate(String value) {
+        if (value == null) {
+            return "";
+        }
+        String compact = value.replaceAll("\\s+", " ").trim();
+        return compact.length() <= 180 ? compact : compact.substring(0, 180) + "…";
     }
 
     /**
@@ -170,12 +378,15 @@ public class CbeVerifierClient {
             throw new BusinessException("CBE_SUFFIX_REQUIRED", "A valid 8-digit CBE account suffix is required.");
         }
         try {
-            byte[] pdf = restClient.get()
+            byte[] pdf = cbeReceiptClient.get()
                     .uri("https://apps.cbe.com.et:100/?id={id}", reference + suffix)
-                    .header("Accept", "application/pdf")
+                    .header("Accept", "application/pdf, application/octet-stream")
                     .header("User-Agent", "Mozilla/5.0 (compatible; VelvetPaymentVerifier/1.0)")
-                    .retrieve()
-                    .body(byte[].class);
+                    .exchange((request, response) -> {
+                        try (InputStream in = response.getBody()) {
+                            return in.readAllBytes();
+                        }
+                    });
             if (pdf == null || pdf.length == 0) {
                 throw new BusinessException("CBE_VERIFY_EMPTY", "CBE did not return a receipt for this transaction.");
             }
@@ -227,22 +438,15 @@ public class CbeVerifierClient {
     }
 
     private BusinessException verifierFailure(Exception error, String proofType) {
-        if (error instanceof ResourceAccessException) {
-            log.warn("CBE verifier {} request timed out or could not connect: {}", proofType, error.getMessage());
+        if (isTransientVerifierError(error)) {
+            log.warn("CBE verifier {} request timed out or could not connect: {}", proofType, error.toString());
             return new BusinessException(
                     "CBE_VERIFIER_UNAVAILABLE",
-                    "CBE verification is temporarily unavailable. Please try again shortly."
+                    "CBE verification is taking too long. Please wait a moment and try again."
             );
         }
         if (error instanceof HttpClientErrorException clientError) {
-            String response = clientError.getResponseBodyAsString();
-            if (response.contains("Could not find Chrome") || response.contains("Puppeteer")) {
-                log.warn("CBE verifier {} service is unhealthy: {}", proofType, clientError.getStatusCode());
-                return new BusinessException(
-                        "CBE_VERIFIER_UNAVAILABLE",
-                        "CBE verification is temporarily unavailable. Please try again shortly."
-                );
-            }
+            return mapVerifierHttpError(clientError.getStatusCode(), clientError.getResponseBodyAsByteArray());
         }
         log.error("CBE {} verification failed", proofType, error);
         return new BusinessException(
@@ -251,6 +455,24 @@ public class CbeVerifierClient {
                         ? "Could not verify CBE receipt screenshot."
                         : "Could not verify CBE transaction reference."
         );
+    }
+
+    private static boolean isTransientVerifierError(Throwable error) {
+        for (Throwable current = error; current != null; current = current.getCause()) {
+            if (current instanceof ResourceAccessException
+                    || current instanceof SocketTimeoutException
+                    || current instanceof java.net.http.HttpTimeoutException
+                    || current instanceof java.net.ConnectException
+                    || current instanceof java.net.UnknownHostException) {
+                return true;
+            }
+            if (current instanceof IOException message
+                    && message.getMessage() != null
+                    && message.getMessage().toLowerCase().contains("timed out")) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private VelvetProperties.CbeVerifier requireCfg() {
@@ -270,7 +492,7 @@ public class CbeVerifierClient {
     }
 
     @SuppressWarnings("unchecked")
-    private VerificationResult parse(Map<String, Object> response) {
+    private static VerificationResult parse(Map<String, Object> response) {
         if (response == null) {
             throw new BusinessException("CBE_VERIFY_EMPTY", "Empty response from CBE verifier.");
         }
@@ -281,9 +503,20 @@ public class CbeVerifierClient {
             success = response.get("error") == null;
         }
 
-        // Nested payloads from autoVerify
+        // Nested payloads from autoVerify or verifier-api v2 list responses
         Object data = response.get("data");
-        if (data instanceof Map<?, ?> nested) {
+        if (data instanceof Iterable<?> values && !(data instanceof Map<?, ?>)) {
+            for (Object item : values) {
+                if (item instanceof Map<?, ?> nested) {
+                    Map<String, Object> n = (Map<String, Object>) nested;
+                    if (Boolean.TRUE.equals(n.get("verified")) || Boolean.TRUE.equals(n.get("success"))) {
+                        success = true;
+                    }
+                    response = n;
+                    break;
+                }
+            }
+        } else if (data instanceof Map<?, ?> nested) {
             raw.put("data", nested);
             Map<String, Object> n = (Map<String, Object>) nested;
             if (n.get("success") != null) {
@@ -308,7 +541,7 @@ public class CbeVerifierClient {
         BigDecimal amount = firstDecimal(response,
                 "transactionAmount", "amount", "settledAmount", "totalPaid", "total", "creditedAmount");
         String payer = first(response, "payerName", "senderName", "payer", "customerName");
-        String receiver = first(response, "receiverName", "creditedPartyName", "beneficiaryName");
+        String receiver = first(response, "receiverName", "receiver", "creditedPartyName", "beneficiaryName");
         String receiverAccount = first(response,
                 "receiverAccount", "receiverAccountNumber", "creditedAccount", "accountNumber", "beneficiaryAccount");
 
@@ -400,5 +633,51 @@ public class CbeVerifierClient {
             }
         }
         return null;
+    }
+
+    static boolean shouldFallbackToDirect(BusinessException error) {
+        String code = error.getCode();
+        return "CBE_VERIFIER_UNAVAILABLE".equals(code) || "CBE_VERIFY_FAILED".equals(code);
+    }
+
+    /**
+     * CBE's public receipt TLS is often untrusted by the JVM. Scope the exception
+     * to this client only — never the hosted verifier HTTPS calls.
+     */
+    private static final class CbeReceiptRequestFactory extends SimpleClientHttpRequestFactory {
+        private static final SSLContext TRUST_ALL;
+
+        static {
+            try {
+                TrustManager[] trustAll = {
+                        new X509TrustManager() {
+                            @Override
+                            public void checkClientTrusted(X509Certificate[] chain, String authType) {}
+
+                            @Override
+                            public void checkServerTrusted(X509Certificate[] chain, String authType) {}
+
+                            @Override
+                            public X509Certificate[] getAcceptedIssuers() {
+                                return new X509Certificate[0];
+                            }
+                        }
+                };
+                SSLContext context = SSLContext.getInstance("TLS");
+                context.init(null, trustAll, new SecureRandom());
+                TRUST_ALL = context;
+            } catch (Exception e) {
+                throw new IllegalStateException("Could not initialize CBE receipt TLS", e);
+            }
+        }
+
+        @Override
+        protected void prepareConnection(HttpURLConnection connection, String httpMethod) throws IOException {
+            super.prepareConnection(connection, httpMethod);
+            if (connection instanceof HttpsURLConnection https) {
+                https.setSSLSocketFactory(TRUST_ALL.getSocketFactory());
+                https.setHostnameVerifier((hostname, session) -> true);
+            }
+        }
     }
 }

@@ -5,11 +5,9 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:velvet_mobile/core/location/location_helper.dart';
 import 'package:velvet_mobile/core/network/dio_client.dart';
 import 'package:velvet_mobile/core/theme/velvet_editorial_colors.dart';
-import 'package:velvet_mobile/core/theme/velvet_theme.dart';
+import 'package:velvet_mobile/core/theme/velvet_tokens.dart';
 import 'package:velvet_mobile/core/widgets/velvet_feedback.dart';
 import 'package:velvet_mobile/core/widgets/velvet_widgets.dart';
-import 'package:velvet_mobile/core/widgets/kinetic_text.dart';
-import 'package:velvet_mobile/core/theme/velvet_tokens.dart';
 import 'package:velvet_mobile/core/widgets/marketplace_flow_hint.dart';
 import 'package:velvet_mobile/features/auth/auth_controller.dart';
 import 'package:velvet_mobile/features/auth/role_helpers.dart';
@@ -93,6 +91,11 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
       availabilityNote: c.availabilityNote,
       verified: c.verified,
       trustScore: c.trustScore,
+      jobTitle: c.jobTitle,
+      languages: c.languages,
+      lookingFor: c.lookingFor,
+      heightCm: c.heightCm,
+      interests: c.interests,
       subtitle: switch (c.likeReason) {
         'PROMPT' => l10n.requestNotedPrompt,
         'PHOTO' => l10n.requestNotedPhoto,
@@ -126,84 +129,84 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
         onboarding.loaded &&
         !onboarding.discoverCoachSeen;
 
+    final colors = context.velvet;
+    final subtitle = isPerformer
+        ? l10n.discoverSubtitlePerformer
+        : isMan
+            ? l10n.discoverSubtitleClient
+            : l10n.discoverSubtitleLocked;
+
     return VelvetScaffold(
-      mistIntensity: 0.2,
+      mistIntensity: 0.15,
       safeArea: true,
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(
-              VelvetTokens.pageInset,
-              VelvetTokens.space24,
-              VelvetTokens.pageInset,
-              VelvetTokens.space12,
-            ),
+            padding: const EdgeInsets.fromLTRB(20, 12, 16, 0),
             child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      KineticEyebrow(
-                        label: isPerformer ? l10n.navRequests : l10n.navBrowse,
-                        icon: Icons.auto_awesome_outlined,
-                      ),
-                      const SizedBox(height: VelvetTokens.space8),
-                      KineticText(
-                        text: title,
-                        splitLines: title.contains('\n'),
-                        style: GoogleFonts.syne(
-                          fontSize: VelvetTokens.displayLarge,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: -1.6,
-                          height: 0.92,
-                          color: context.velvet.ink,
+                      Text(
+                        isPerformer ? l10n.navRequests : l10n.navBrowse,
+                        style: GoogleFonts.dmSans(
+                          color: VelvetTokens.ember,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 1.2,
                         ),
                       ),
-                      const SizedBox(height: VelvetTokens.space8),
+                      const SizedBox(height: 4),
                       Text(
-                        isPerformer
-                            ? l10n.discoverSubtitlePerformer
-                            : isMan
-                            ? l10n.discoverSubtitleClient
-                            : l10n.discoverSubtitleLocked,
-                        style: GoogleFonts.dmSans(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w500,
-                          color: context.velvet.muted,
-                          height: 1.45,
+                        title,
+                        style: GoogleFonts.syne(
+                          fontSize: 34,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: -1.4,
+                          height: 0.95,
+                          color: colors.ink,
                         ),
                       ),
                     ],
                   ),
                 ),
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (!isPerformer) ...[
-                      VelvetIconChip(
-                        icon: Icons.tune_rounded,
-                        onTap: () async {
-                          await showFiltersSheet(context, ref);
-                          ref.invalidate(discoverFeedProvider);
-                        },
-                      ),
-                      const SizedBox(width: 8),
-                    ],
-                    VelvetIconChip(
-                      icon: Icons.notifications_none_rounded,
-                      badgeCount: unreadCount,
-                      onTap: () => context.push('/notifications'),
-                    ),
-                  ],
+                if (!isPerformer) ...[
+                  VelvetIconChip(
+                    icon: Icons.tune_rounded,
+                    onTap: () async {
+                      await showFiltersSheet(context, ref);
+                      ref.invalidate(discoverFeedProvider);
+                    },
+                  ),
+                  const SizedBox(width: 8),
+                ],
+                VelvetIconChip(
+                  icon: Icons.notifications_none_rounded,
+                  badgeCount: unreadCount,
+                  onTap: () => context.push('/notifications'),
                 ),
               ],
             ),
           ),
           Padding(
-            padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
+            child: Text(
+              subtitle,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: GoogleFonts.dmSans(
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+                color: colors.muted,
+                height: 1.35,
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
             child: VelvetSegmentedControl(
               labels: [primaryLabel, l10n.segmentIntros],
               index: _segment,
@@ -212,7 +215,7 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
           ),
           if (showCoach)
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
               child: DiscoverCoachBanner(
                 title: l10n.discoverCoachTitle,
                 body: l10n.discoverCoachBody,
@@ -224,6 +227,8 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
           Expanded(
             child: AnimatedSwitcher(
               duration: const Duration(milliseconds: 280),
+              switchInCurve: Curves.easeOutCubic,
+              switchOutCurve: Curves.easeInCubic,
               child: KeyedSubtree(
                 key: ValueKey('${isPerformer ? 'w' : 'm'}-$_segment'),
                 child: _segment == 1
@@ -266,7 +271,7 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
         }
 
         return RefreshIndicator(
-          color: VelvetTheme.teal,
+          color: VelvetTokens.ember,
           onRefresh: () async {
             ref.invalidate(conciergeIntrosProvider);
             await ref.read(conciergeIntrosProvider.future);
@@ -392,7 +397,7 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
         }
 
         return RefreshIndicator(
-          color: VelvetTheme.teal,
+          color: VelvetTokens.ember,
           onRefresh: () async {
             ref.invalidate(discoverFeedProvider);
             await ref.read(discoverFeedProvider.future);
@@ -498,7 +503,7 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
         }
 
         return RefreshIndicator(
-          color: VelvetTheme.teal,
+          color: VelvetTokens.ember,
           onRefresh: () async {
             ref.invalidate(receivedRequestsProvider);
             await ref.read(receivedRequestsProvider.future);
