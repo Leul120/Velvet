@@ -82,8 +82,9 @@ velvet:
     # Scrub panic GPS after N days (PDPP minimization)
     location-days: ${RETENTION_LOCATION_DAYS:7}
   seed:
-    # Wipe + reseed demo members on every API start (local/dev). Forced off in production.
-    reset-on-startup: ${VELVET_SEED_RESET:true}
+    # Wipe + reseed demo members on boot when enabled. Local compose sets true;
+    # container image defaults VELVET_SEED_RESET=false to avoid OOM on small hosts.
+    reset-on-startup: ${VELVET_SEED_RESET:false}
   sms:
     # log | http — http posts JSON {to,from,message} to velvet.sms.http-url
     provider: ${SMS_PROVIDER:log}
@@ -151,8 +152,10 @@ velvet:
 
 springdoc:
   api-docs:
+    enabled: ${SPRINGDOC_API_DOCS_ENABLED:true}
     path: /v3/api-docs
   swagger-ui:
+    enabled: ${SPRINGDOC_SWAGGER_UI_ENABLED:true}
     path: /swagger-ui.html
 
 logging:
