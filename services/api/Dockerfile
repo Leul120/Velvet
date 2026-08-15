@@ -16,5 +16,17 @@ FROM eclipse-temurin:17-jre-alpine AS runtime
 WORKDIR /app
 COPY --from=build /out/app.jar app.jar
 EXPOSE 8080
-# Render sets PORT; local Docker compose leaves it unset (defaults to 8080).
-ENTRYPOINT ["sh", "-c", "exec java -jar /app/app.jar --server.port=${PORT:-8080}"]
+
+# Lean defaults for small hosts (Render free = 512MB). Local compose overrides seed.
+ENV VELVET_SEED_RESET=false \
+    SPRING_LAZY=true \
+    DB_POOL_SIZE=3 \
+    DB_POOL_IDLE=1 \
+    TOMCAT_MAX_THREADS=40 \
+    TOMCAT_MIN_SPARE=2 \
+    SPRINGDOC_API_DOCS_ENABLED=false \
+    SPRINGDOC_SWAGGER_UI_ENABLED=false
+
+# Cap heap vs container RAM; SerialGC uses less native memory than G1 on tiny boxes.
+# Render sets PORT; local Docker leaves it unset (defaults to 8080).
+ENTRYPOINT ["sh", "-c", "exec java -XX:MaxRAMPercentage=55 -XX:+UseSerialGC -XX:MaxMetaspaceSize=128m -Xss512k -XX:+ExitOnOutOfMemoryError -jar /app/app.jar --server.port=${PORT:-8080}"]
