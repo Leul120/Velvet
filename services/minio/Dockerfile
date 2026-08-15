@@ -1,4 +1,4 @@
 FROM minio/minio:latest
-# Render private services expect a single listening port; 10000 matches render.yaml.
-CMD ["server", "/data", "--address", ":10000", "--console-address", ":10001"]
+# Render injects PORT; bind object API there so the free web service health-proxies correctly.
+CMD ["sh", "-c", "exec minio server /data --address :${PORT:-10000} --console-address :$(( ${PORT:-10000} + 1 ))"]
 EXPOSE 10000
