@@ -267,13 +267,24 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
       imageQuality: 85,
     );
     if (shot == null) return;
-    String? reference = await ReceiptReference.fromImage(shot.path);
+    if (!mounted) return;
+    setState(() => _actioning = true);
+    String? reference;
+    try {
+      reference = await ReceiptReference.fromImage(shot.path);
+    } finally {
+      if (mounted) setState(() => _actioning = false);
+    }
     if (!mounted) return;
     final confirmedReference = await showEditorialPrompt(
       context: context,
-      title: 'Confirm CBE transaction reference',
+      title: reference == null
+          ? 'Enter CBE transaction reference'
+          : 'Confirm CBE transaction reference',
       fieldLabel: 'FT / transaction reference',
-      helperText: 'Extracted from the screenshot. Correct it if needed.',
+      helperText: reference == null
+          ? 'Could not read the FT code automatically. Enter the 12-character code from your receipt.'
+          : 'Extracted from the screenshot. Correct it if needed.',
       initialValue: reference,
       confirmLabel: 'Verify payment',
       cancelLabel: 'Cancel',
@@ -295,8 +306,13 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
       });
       _setBookingWithPulse(refreshed);
       if (mounted) {
-        await showVelvetToast(context, message: l10n.bookingPaid);
+        await showVelvetToast(
+          context,
+          message: 'Receipt uploaded! Pending admin verification.',
+          icon: Icons.mark_email_read_outlined,
+        );
       }
+
     } catch (e) {
       await _handlePaymentProofError(e);
     } finally {

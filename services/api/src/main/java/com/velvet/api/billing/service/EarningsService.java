@@ -35,6 +35,7 @@ public class EarningsService {
     private final PayoutRequestRepository payoutRequestRepository;
     private final UserRepository userRepository;
     private final ConnectionRepository connectionRepository;
+    private final com.velvet.api.booking.repo.BookingRepository bookingRepository;
     private final ConciergeNotifyService conciergeNotifyService;
     private final MemberNotifyService memberNotifyService;
 
@@ -43,6 +44,7 @@ public class EarningsService {
             PayoutRequestRepository payoutRequestRepository,
             UserRepository userRepository,
             ConnectionRepository connectionRepository,
+            com.velvet.api.booking.repo.BookingRepository bookingRepository,
             ConciergeNotifyService conciergeNotifyService,
             MemberNotifyService memberNotifyService
     ) {
@@ -50,9 +52,33 @@ public class EarningsService {
         this.payoutRequestRepository = payoutRequestRepository;
         this.userRepository = userRepository;
         this.connectionRepository = connectionRepository;
+        this.bookingRepository = bookingRepository;
         this.conciergeNotifyService = conciergeNotifyService;
         this.memberNotifyService = memberNotifyService;
     }
+
+    /**
+     * Process 24-hour escrow auto-releases every 5 minutes.
+     * Credits performer earnings ledger if 24 hours have elapsed post-date completion with no dispute filed.
+     */
+    @org.springframework.scheduling.annotation.Scheduled(cron = "0 */5 * * * *")
+    @Transactional
+    public void processEscrowReleases() {
+        Instant now = Instant.now();
+        List<BookingEntity> ready = bookingRepository.findByEscrowReleaseAtBeforeAndEscrowReleasedAtIsNullAndDisputedAtIsNull(now);
+        for (BookingEntity booking : ready) {
+            if (booking.getAmountEtb() != null && booking.getAmountEtb() > 0) {
+                PaymentIntentEntity dummyIntent = PaymentIntentEntity.builder()
+                        .amountEtb(BigDecimal.valueOf(booking.getAmountEtb()))
+                        .build();
+
+                creditPerformerForPaidBooking(booking, dummyIntent);
+            }
+            booking.setEscrowReleasedAt(now);
+            bookingRepository.save(booking);
+        }
+    }
+
 
     /**
      * After a booking payment succeeds: credit the performer and record the platform fee.

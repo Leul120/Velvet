@@ -63,6 +63,41 @@ public class MeController {
         return ResponseEntity.ok(profileService.reorderPhotos(principal.getUserId(), request));
     }
 
+    @PostMapping("/vault/photos")
+    public ResponseEntity<ProfileDtos.MeResponse> addPrivatePhoto(
+            @AuthenticationPrincipal VelvetPrincipal principal,
+            @Valid @RequestBody ProfileDtos.AddPhotoRequest request
+    ) {
+        return ResponseEntity.ok(profileService.addPrivatePhoto(principal.getUserId(), request));
+    }
+
+    @PostMapping("/vault/grant")
+    public ResponseEntity<Map<String, String>> grantVaultAccess(
+            @AuthenticationPrincipal VelvetPrincipal principal,
+            @Valid @RequestBody ProfileDtos.GrantVaultAccessRequest request
+    ) {
+        profileService.grantVaultAccess(principal.getUserId(), request.memberId(), request.reason());
+        return ResponseEntity.ok(Map.of("status", "GRANTED"));
+    }
+
+    @PostMapping("/available-tonight")
+    public ResponseEntity<ProfileDtos.MeResponse> toggleAvailableTonight(
+            @AuthenticationPrincipal VelvetPrincipal principal,
+            @Valid @RequestBody ProfileDtos.ToggleAvailableTonightRequest request
+    ) {
+        return ResponseEntity.ok(profileService.toggleAvailableTonight(principal.getUserId(), request));
+    }
+
+    @PostMapping("/voice-intro")
+    public ResponseEntity<ProfileDtos.MeResponse> setVoiceIntro(
+            @AuthenticationPrincipal VelvetPrincipal principal,
+            @Valid @RequestBody ProfileDtos.UploadVoiceIntroRequest request
+    ) {
+        return ResponseEntity.ok(profileService.setVoiceIntro(principal.getUserId(), request));
+    }
+
+
+
     @PostMapping("/withdraw")
     public ResponseEntity<Map<String, String>> withdraw(
             @AuthenticationPrincipal VelvetPrincipal principal

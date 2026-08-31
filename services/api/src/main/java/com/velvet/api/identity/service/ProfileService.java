@@ -37,7 +37,9 @@ public class ProfileService {
     private final AuditService auditService;
     private final LegalConsentService legalConsentService;
     private final com.velvet.api.booking.service.TrustService trustService;
+    private final com.velvet.api.identity.repo.VaultAccessGrantRepository vaultAccessGrantRepository;
     private final ObjectStorageService storageService;
+
 
     public ProfileService(
             UserRepository userRepository,
@@ -47,6 +49,7 @@ public class ProfileService {
             AuditService auditService,
             LegalConsentService legalConsentService,
             com.velvet.api.booking.service.TrustService trustService,
+            com.velvet.api.identity.repo.VaultAccessGrantRepository vaultAccessGrantRepository,
             ObjectStorageService storageService
     ) {
         this.userRepository = userRepository;
@@ -56,8 +59,10 @@ public class ProfileService {
         this.auditService = auditService;
         this.legalConsentService = legalConsentService;
         this.trustService = trustService;
+        this.vaultAccessGrantRepository = vaultAccessGrantRepository;
         this.storageService = storageService;
     }
+
 
     @Transactional(readOnly = true)
     public ProfileDtos.MeResponse getMe(UUID userId) {
@@ -345,7 +350,85 @@ public class ProfileService {
                 profile.getPhotoQualityStatus(), profile.getPhotoQualityNotes(), profile.getUpdatedAt());
     }
 
+    @Transactional(readOnly = true)
+    public boolean hasVaultAccess(UUID performerId, UUID memberId) {
+        if (performerId == null || memberId == null) return false;
+        if (performerId.equals(memberId)) return true;
+
+        UserEntity viewer = userRepository.findById(memberId).orElse(null);
+        if (viewer != null && (viewer.getRole() == UserRole.ADMIN || viewer.getRole() == UserRole.CONCIERGE || viewer.getRole() == UserRole.SUBSCRIBER)) {
+            return true;
+        }
+
+        return vaultAccessGrantRepository.existsByPerformerIdAndMemberId(performerId, memberId);
+    }
+
+    @Transactional
+    public void grantVaultAccess(UUID performerId, UUID memberId, String reason) {
+        if (performerId.equals(memberId)) return;
+        if (!vaultAccessGrantRepository.existsByPerformerIdAndMemberId(performerId, memberId)) {
+            com.velvet.api.identity.domain.VaultAccessGrantEntity grant = com.velvet.api.identity.domain.VaultAccessGrantEntity.builder()
+                    .performerId(performerId)
+                    .memberId(memberId)
+                    .grantedBy(performerId)
+                    .reason(reason == null ? "Direct performer grant" : reason)
+                    .build();
+            vaultAccessGrantRepository.save(grant);
+        }
+    }
+
+    @Transactional
+    public ProfileDtos.MeResponse addPrivatePhoto(UUID userId, ProfileDtos.AddPhotoRequest request) {
+        String url = request == null ? null : request.url();
+        if (url == null || url.isBlank()) {
+            throw new BusinessException("URL_REQUIRED", "Photo URL is required.");
+        }
+        UserEntity user = requireActiveAccount(userId);
+        MemberProfileEntity profile = profileRepository.findById(userId)
+                .orElseGet(() -> MemberProfileEntity.builder().userId(userId).build());
+
+        List<String> privates = new ArrayList<>(profile.getPrivatePhotoUrls() == null ? List.of() : profile.getPrivatePhotoUrls());
+        if (!privates.contains(url)) {
+            privates.add(url);
+            profile.setPrivatePhotoUrls(privates);
+            profileRepository.save(profile);
+        }
+        return toMe(user, profile, userId);
+    }
+
+    @Transactional
+    public ProfileDtos.MeResponse toggleAvailableTonight(UUID userId, ProfileDtos.ToggleAvailableTonightRequest request) {
+        UserEntity user = requireActiveAccount(userId);
+        MemberProfileEntity profile = profileRepository.findById(userId)
+                .orElseGet(() -> MemberProfileEntity.builder().userId(userId).build());
+
+        profile.setAvailableTonight(request.availableTonight());
+        if (request.availableNeighborhood() != null) {
+            profile.setAvailableNeighborhood(request.availableNeighborhood().trim());
+        }
+        profileRepository.save(profile);
+        return toMe(user, profile, userId);
+    }
+
+    @Transactional
+    public ProfileDtos.MeResponse setVoiceIntro(UUID userId, ProfileDtos.UploadVoiceIntroRequest request) {
+        UserEntity user = requireActiveAccount(userId);
+        MemberProfileEntity profile = profileRepository.findById(userId)
+                .orElseGet(() -> MemberProfileEntity.builder().userId(userId).build());
+
+        profile.setVoiceIntroUrl(request.voiceIntroUrl().trim());
+        profileRepository.save(profile);
+        return toMe(user, profile, userId);
+    }
+
     private ProfileDtos.MeResponse toMe(UserEntity user, MemberProfileEntity profile) {
+        return toMe(user, profile, user.getId());
+    }
+
+    public ProfileDtos.MeResponse toMe(UserEntity user, MemberProfileEntity profile, UUID viewingUserId) {
+        boolean canSeeVault = hasVaultAccess(profile.getUserId(), viewingUserId);
+        List<String> privates = (canSeeVault && profile.getPrivatePhotoUrls() != null) ? profile.getPrivatePhotoUrls() : List.of();
+
         return new ProfileDtos.MeResponse(
                 user.getId().toString(),
                 user.getPhoneE164(),
@@ -366,12 +449,19 @@ public class ProfileService {
                         profile.getSessionRateEtb(),
                         profile.getOvernightRateEtb(),
                         profile.getAvailabilityNote(),
+                        profile.isAvailableTonight(),
+                        profile.getAvailableNeighborhood(),
+                        profile.getVoiceIntroUrl(),
                         profile.isListingActive(),
                         profile.getInterests() == null ? java.util.List.of() : profile.getInterests(),
                         profile.getPhotoUrls() == null ? java.util.List.of() : profile.getPhotoUrls(),
+                        privates,
+                        canSeeVault,
                         profile.getPhotoQualityStatus() == null ? "APPROVED" : profile.getPhotoQualityStatus()
                 ),
                 trustService.getTrustScore(user.getId())
         );
     }
+
+
 }

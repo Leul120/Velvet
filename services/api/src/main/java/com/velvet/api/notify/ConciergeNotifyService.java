@@ -34,6 +34,7 @@ public class ConciergeNotifyService {
     private final DeviceTokenRepository deviceTokenRepository;
     private final UserRepository userRepository;
     private final StaffShiftService staffShiftService;
+    private final com.velvet.api.admin.sse.AdminSseRegistry adminSseRegistry;
 
     public ConciergeNotifyService(
             NotificationOutboxRepository outboxRepository,
@@ -42,7 +43,8 @@ public class ConciergeNotifyService {
             PushGateway pushGateway,
             DeviceTokenRepository deviceTokenRepository,
             UserRepository userRepository,
-            StaffShiftService staffShiftService
+            StaffShiftService staffShiftService,
+            com.velvet.api.admin.sse.AdminSseRegistry adminSseRegistry
     ) {
         this.outboxRepository = outboxRepository;
         this.properties = properties;
@@ -51,6 +53,7 @@ public class ConciergeNotifyService {
         this.deviceTokenRepository = deviceTokenRepository;
         this.userRepository = userRepository;
         this.staffShiftService = staffShiftService;
+        this.adminSseRegistry = adminSseRegistry;
     }
 
     @Transactional
@@ -58,6 +61,11 @@ public class ConciergeNotifyService {
         String body = "VELVET PANIC id=%s user=%s note=%s loc=%s,%s"
                 .formatted(alertId, userId, note == null ? "-" : note, lat, lng);
         dispatch("VELVET PANIC", body, "PANIC", alertId, true);
+        adminSseRegistry.broadcast("PANIC_ALERT", java.util.Map.of(
+                "alertId", alertId,
+                "userId", userId,
+                "note", note == null ? "" : note
+        ));
     }
 
     @Transactional
@@ -65,7 +73,13 @@ public class ConciergeNotifyService {
         String body = "VELVET REPORT id=%s category=%s details=%s"
                 .formatted(reportId, category, truncate(details, 200));
         dispatch("VELVET REPORT", body, "REPORT", reportId, false);
+        adminSseRegistry.broadcast("SAFETY_REPORT", java.util.Map.of(
+                "reportId", reportId,
+                "category", category,
+                "details", details
+        ));
     }
+
 
     @Transactional
     public void notifyOps(String subject, String body, String relatedType, String relatedId) {

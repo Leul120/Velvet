@@ -601,11 +601,19 @@ public class CbeVerifierClient {
             }
             return null;
         }
-        String normalized = value.toString().toUpperCase()
-                .replaceAll("[\\s:.-]", "");
-        Matcher matcher = CBE_REFERENCE.matcher(normalized);
-        return matcher.find() ? matcher.group() : null;
+        String str = value.toString().toUpperCase();
+        String cleaned = str.replaceAll("[^A-Z0-9]", "");
+        Matcher matcher = CBE_REFERENCE.matcher(cleaned);
+        if (matcher.find()) return matcher.group();
+
+        Pattern misreadLabel = Pattern.compile("(?:TRANSACTION|TXN|REF|RECEIPT|FT)(?:ID|NO|NUM|NUMBER|CODE)?(?:FI|F1|PT|ET|TT)([A-Z0-9]{10})");
+        Matcher misreadMatch = misreadLabel.matcher(cleaned);
+        if (misreadMatch.find()) {
+            return "FT" + misreadMatch.group(1);
+        }
+        return null;
     }
+
 
     private static String first(Map<String, Object> map, String... keys) {
         for (String key : keys) {

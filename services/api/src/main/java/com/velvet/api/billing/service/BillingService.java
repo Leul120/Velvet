@@ -34,6 +34,8 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 
+import com.velvet.api.notify.ConciergeNotifyService;
+
 @Service
 public class BillingService {
 
@@ -51,6 +53,8 @@ public class BillingService {
     private final TelebirrNotifyVerifier notifyVerifier;
     private final CbeVerifierClient cbeVerifierClient;
     private final ObjectStorageService storageService;
+    private final ConciergeNotifyService conciergeNotifyService;
+    private final com.velvet.api.admin.sse.AdminSseRegistry adminSseRegistry;
     private final VelvetProperties properties;
 
     public BillingService(
@@ -66,6 +70,8 @@ public class BillingService {
             TelebirrNotifyVerifier notifyVerifier,
             CbeVerifierClient cbeVerifierClient,
             ObjectStorageService storageService,
+            ConciergeNotifyService conciergeNotifyService,
+            com.velvet.api.admin.sse.AdminSseRegistry adminSseRegistry,
             VelvetProperties properties
     ) {
         this.planRepository = planRepository;
@@ -80,8 +86,12 @@ public class BillingService {
         this.notifyVerifier = notifyVerifier;
         this.cbeVerifierClient = cbeVerifierClient;
         this.storageService = storageService;
+        this.conciergeNotifyService = conciergeNotifyService;
+        this.adminSseRegistry = adminSseRegistry;
         this.properties = properties;
     }
+
+
 
     @Transactional(readOnly = true)
     public List<BillingDtos.PlanResponse> listPlans() {
@@ -352,73 +362,49 @@ public class BillingService {
             throw new BusinessException("CBE_SUFFIX_REQUIRED", "CBE account suffix (last 8 digits) is required.");
         }
 
-        CbeVerifierClient.VerificationResult verified;
         String receiptUrl = null;
         if (receipt != null && !receipt.isEmpty()) {
             receiptUrl = storageService.uploadPaymentReceipt(userId, receipt);
             intent.setReceiptUrl(receiptUrl);
         }
         if (reference != null && !reference.isBlank()) {
-            verified = cbeVerifierClient.verifyReference(reference, suffix);
-        } else if (receipt != null && !receipt.isEmpty()) {
-            // Compatibility fallback for verifier deployments that support image OCR directly.
-            verified = cbeVerifierClient.verifyImage(receipt, suffix);
-        } else {
-            throw new BusinessException("PROOF_REQUIRED", "Upload a CBE receipt screenshot or provide a transaction reference.");
+            String cleanRef = reference.trim().toUpperCase(Locale.ROOT);
+            intent.setProviderRef(cleanRef);
         }
 
-        if (!verified.success()) {
-            // Verifier returned a definitive rejection (not a transient error). Keep the
-            // intent at CHECKOUT so the user can retry with a better screenshot.
-            Map<String, Object> rejRaw = new HashMap<>(verified.raw() == null ? Map.of() : verified.raw());
-            if (receiptUrl != null) rejRaw.put("receiptUrl", receiptUrl);
-            intent.setRawNotify(rejRaw);
-            paymentIntentRepository.save(intent);
-            throw new BusinessException("CBE_VERIFY_REJECTED",
-                    "CBE receipt could not be verified. Please re-upload a clear screenshot and try again.");
+        if (receiptUrl == null && (intent.getProviderRef() == null || intent.getProviderRef().isBlank())) {
+            throw new BusinessException("PROOF_REQUIRED", "Upload a receipt screenshot or provide a transaction reference.");
         }
 
-        if (verified.reference() == null || verified.reference().isBlank()) {
-            throw new BusinessException("CBE_REFERENCE_MISSING", "The receipt OCR did not return a CBE FT transaction code. Enter the code and try again.");
-        }
-        String ref = cbeVerifierClient.isMock()
-                ? verified.reference().trim().toUpperCase(Locale.ROOT)
-                : CbeVerifierClient.requireExactCbeReference(verified.reference());
-
-        paymentIntentRepository.findByProviderAndProviderRefIgnoreCase("CBE", ref)
-                .filter(existing -> existing.getStatus() == PaymentStatus.PAID)
-                .ifPresent(existing -> {
-                    throw new BusinessException("CBE_REFERENCE_USED", "This CBE transaction was already used for a payment.");
-                });
-
-        if (!cbeVerifierClient.isMock()) {
-            assertAmountMatches(intent.getAmountEtb(), verified.amountEtb());
-            assertReceiverMatches(pay, verified);
-        } else if (verified.amountEtb() == null) {
-            // mock image path — treat expected amount as paid
-            verified = new CbeVerifierClient.VerificationResult(
-                    true,
-                    ref,
-                    intent.getAmountEtb(),
-                    verified.payerName(),
-                    verified.receiverName(),
-                    verified.receiverAccount(),
-                    verified.raw()
-            );
-        }
-
-        Map<String, Object> raw = new HashMap<>(verified.raw() == null ? Map.of() : verified.raw());
-        raw.put("receiptUrl", receiptUrl);
-        raw.put("accountSuffix", suffix);
+        Map<String, Object> raw = new HashMap<>(intent.getRawNotify() == null ? Map.of() : intent.getRawNotify());
+        if (receiptUrl != null) raw.put("receiptUrl", receiptUrl);
+        raw.put("proofSubmittedAt", Instant.now().toString());
         intent.setRawNotify(raw);
-        intent.setProviderRef(ref);
-        markPaidAndActivate(intent, ref, "CBE transfer " + ref);
+        intent.setStatus(PaymentStatus.CHECKOUT);
+        paymentIntentRepository.save(intent);
+
+        conciergeNotifyService.notifyOps(
+                "CBE_PROOF_SUBMITTED",
+                "New payment proof submitted for " + intent.getPurpose() + " (" + intent.getAmountEtb() + " ETB). Pending admin manual verification.",
+                "PAYMENT",
+                intent.getId().toString()
+        );
+
+        adminSseRegistry.broadcast("PAYMENT_PROOF_SUBMITTED", Map.of(
+                "intentId", intent.getId().toString(),
+                "amountEtb", intent.getAmountEtb(),
+                "purpose", intent.getPurpose(),
+                "userId", intent.getUserId().toString()
+        ));
+
+
 
         if ("BOOKING".equals(intent.getPurpose())) {
             return toCheckout(intent, null);
         }
         return currentSubscription(userId);
     }
+
 
     /**
      * Returns the current pending CBE payment checkout for a given booking so the
@@ -801,9 +787,17 @@ public class BillingService {
     }
 
     private BillingDtos.PaymentIntentAdminItem toAdminItem(PaymentIntentEntity i) {
+        UserEntity user = userRepository.findById(i.getUserId()).orElse(null);
+        String name = user == null ? "Member" : (user.getDisplayName() == null || user.getDisplayName().isBlank() ? "Member" : user.getDisplayName());
+        String phone = user == null ? "" : (user.getPhoneE164() == null ? "" : user.getPhoneE164());
+        String role = user == null ? "MEMBER" : user.getRole().name();
+
         return new BillingDtos.PaymentIntentAdminItem(
                 i.getId().toString(),
                 i.getUserId().toString(),
+                name,
+                phone,
+                role,
                 i.getPurpose(),
                 i.getBookingId() == null ? null : i.getBookingId().toString(),
                 i.getProvider(),
@@ -817,6 +811,7 @@ public class BillingService {
                 i.getPaidAt()
         );
     }
+
 
     private SubscriptionPlanEntity requirePlan(String planCode) {
         return planRepository.findByCodeIgnoreCase(planCode.trim())

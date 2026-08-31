@@ -35,11 +35,37 @@ public final class ProfileDtos {
             Integer sessionRateEtb,
             Integer overnightRateEtb,
             String availabilityNote,
+            boolean availableTonight,
+            String availableNeighborhood,
+            String voiceIntroUrl,
             boolean listingActive,
             List<String> interests,
             List<String> photoUrls,
+            List<String> privatePhotoUrls,
+            boolean hasVaultAccess,
             String photoQualityStatus
     ) {}
+
+    public record ToggleAvailableTonightRequest(
+            boolean availableTonight,
+            @Size(max = 64) String availableNeighborhood
+    ) {}
+
+    public record UploadVoiceIntroRequest(
+            @jakarta.validation.constraints.NotBlank @Size(max = 1024) String voiceIntroUrl
+    ) {}
+
+    public record GrantVaultAccessRequest(
+            @jakarta.validation.constraints.NotNull java.util.UUID memberId,
+            @Size(max = 120) String reason
+    ) {}
+
+    public record RequestVaultAccessRequest(
+            @jakarta.validation.constraints.NotNull java.util.UUID performerId,
+            @Size(max = 280) String message
+    ) {}
+
+
 
     public record UpdateMeRequest(
             @Size(max = 120) String displayName,

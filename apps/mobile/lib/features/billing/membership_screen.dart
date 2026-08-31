@@ -124,9 +124,21 @@ class _MembershipScreenState extends ConsumerState<MembershipScreen> {
       imageQuality: 85,
     );
     if (shot == null) return;
+    if (!mounted) return;
 
-    final scannedReference = await ReceiptReference.fromImage(shot.path);
-    final reference = await _confirmCbeReference(scannedReference);
+    setState(() => _submitting = true);
+    String? scannedReference;
+    try {
+      scannedReference = await ReceiptReference.fromImage(shot.path);
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
+    if (!mounted) return;
+
+    final reference = await _confirmCbeReference(
+      scannedReference,
+      fromScreenshot: true,
+    );
     if (!mounted || reference == null) return;
 
     setState(() => _submitting = true);
@@ -141,10 +153,11 @@ class _MembershipScreenState extends ConsumerState<MembershipScreen> {
       if (mounted) {
         await showVelvetToast(
           context,
-          message: l10n.cbePaymentVerified,
-          icon: Icons.verified_outlined,
+          message: 'Receipt uploaded! Pending admin verification.',
+          icon: Icons.mark_email_read_outlined,
         );
       }
+
       setState(() => _pending = null);
       await _load();
     } catch (e) {
@@ -187,14 +200,19 @@ class _MembershipScreenState extends ConsumerState<MembershipScreen> {
     }
   }
 
-  Future<String?> _confirmCbeReference(String? scannedReference) async {
+  Future<String?> _confirmCbeReference(
+    String? scannedReference, {
+    bool fromScreenshot = false,
+  }) async {
     final controller = TextEditingController(text: scannedReference ?? '');
     final result = await showEditorialDialog<String>(
       context: context,
       title: 'Review transaction code',
-      message: scannedReference == null
-          ? 'Enter the 12-character FT code shown on your CBE receipt.'
-          : 'We found this CBE code in your receipt. Confirm it before verification.',
+      message: scannedReference != null
+          ? 'We found this CBE code in your receipt. Confirm it before verification.'
+          : fromScreenshot
+          ? 'Could not read the FT code from the screenshot. Enter the 12-character code manually.'
+          : 'Enter the 12-character FT code shown on your CBE receipt.',
       icon: Icons.receipt_long_outlined,
       content: VelvetField(
         controller: controller,

@@ -85,6 +85,19 @@ public class BookingEntity {
     @Column(name = "messages_purged_at")
     private Instant messagesPurgedAt;
 
+    @Column(name = "escrow_release_at")
+    private Instant escrowReleaseAt;
+
+    @Column(name = "escrow_released_at")
+    private Instant escrowReleasedAt;
+
+    @Column(name = "disputed_at")
+    private Instant disputedAt;
+
+    @Column(name = "dispute_notes", length = 500)
+    private String disputeNotes;
+
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;

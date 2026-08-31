@@ -1,103 +1,24 @@
-# Render Blueprint for VELVET API + Postgres + Redis + MinIO.
-# Secrets (JWT, CBE keys) are sync: false — set them in the Dashboard after apply.
-# Free Postgres expires after 30 days; upgrade the plan for a lasting environment.
-
-databases:
-  - name: velvet-postgres
-    databaseName: velvet
-    user: velvet
-    plan: free
-    region: frankfurt
-    postgresMajorVersion: 16
-
 services:
-  - type: keyvalue
-    name: velvet-redis
-    plan: free
-    region: frankfurt
-    ipAllowList: []
-
-  - type: pserv
-    name: velvet-minio
-    runtime: image
-    plan: free
-    region: frankfurt
-    image:
-      url: minio/minio:latest
-    dockerCommand: server /data --address :10000 --console-address :10001
-    envVars:
-      - key: MINIO_ROOT_USER
-        value: velvet
-      - key: MINIO_ROOT_PASSWORD
-        value: velvetsecret
-      - key: PORT
-        value: "10000"
-
   - type: web
     name: velvet-api
-    runtime: docker
+    env: docker
+    dockerfilePath: ./services/api/Dockerfile
+    dockerContext: ./services/api
     plan: free
     region: frankfurt
-    rootDir: services/api
-    healthCheckPath: /actuator/health
     envVars:
-      - key: VELVET_ENV
-        value: local
-      - key: OTP_EXPOSE
-        value: "true"
+      - key: SPRING_PROFILES_ACTIVE
+        value: prod
+      - key: DB_URL
+        fromDatabase:
+          name: velvet-db
+          property: connectionString
       - key: VELVET_SEED_RESET
-        value: "true"
-      - key: JWT_SECRET
-        generateValue: true
-      - key: DB_HOST
-        fromDatabase:
-          name: velvet-postgres
-          property: host
-      - key: DB_PORT
-        fromDatabase:
-          name: velvet-postgres
-          property: port
-      - key: DB_NAME
-        fromDatabase:
-          name: velvet-postgres
-          property: database
-      - key: DB_USER
-        fromDatabase:
-          name: velvet-postgres
-          property: user
-      - key: DB_PASSWORD
-        fromDatabase:
-          name: velvet-postgres
-          property: password
-      - key: REDIS_HOST
-        fromService:
-          name: velvet-redis
-          type: keyvalue
-          property: host
-      - key: REDIS_PORT
-        fromService:
-          name: velvet-redis
-          type: keyvalue
-          property: port
-      - key: S3_ENDPOINT
-        value: http://velvet-minio:10000
-      - key: S3_ACCESS_KEY
-        value: velvet
-      - key: S3_SECRET_KEY
-        value: velvetsecret
-      - key: S3_BUCKET
-        value: velvet
-      - key: S3_PUBLIC_BASE
-        value: relative
-      - key: BILLING_PROVIDER
-        value: cbe
-      - key: CBE_VERIFIER_MODE
-        value: mock
-      - key: CBE_ACCOUNT_NAME
-        value: VELVET Ethiopia
-      - key: CBE_ACCOUNT_NUMBER
-        sync: false
-      - key: CBE_ACCOUNT_SUFFIX
-        sync: false
-      - key: CBE_VERIFIER_API_KEY
-        sync: false
+        value: "false"
+
+databases:
+  - name: velvet-db
+    plan: free
+    databaseName: velvet
+    user: velvet
+

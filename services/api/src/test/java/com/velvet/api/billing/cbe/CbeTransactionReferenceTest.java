@@ -22,7 +22,13 @@ class CbeTransactionReferenceTest {
     void normalizesOcrSeparatorsButKeepsTheEntireCbeFtCode() {
         assertEquals("FT2513001V2G", CbeVerifierClient.requireExactCbeReference("ft 2513-001-v2g"));
         assertEquals("FT26217SSG8W", CbeVerifierClient.requireExactCbeReference("Transaction ID: FT26217SSG8W"));
+        assertEquals("FT26217SSG8W", CbeVerifierClient.requireExactCbeReference("Txn Ref: FT:26217.SSG8W"));
+        assertEquals("FT26217SSG8W", CbeVerifierClient.requireExactCbeReference("Ref No: FT/26217/SSG8W"));
+        assertEquals("FT26217SSG8W", CbeVerifierClient.requireExactCbeReference("Trans. Ref: (FT26217SSG8W)"));
+        assertEquals("FT26217SSG8W", CbeVerifierClient.requireExactCbeReference("Transaction ID: FI26217SSG8W"));
+        assertEquals("FT26217SSG8W", CbeVerifierClient.requireExactCbeReference("Txn Ref: F126217SSG8W"));
     }
+
 
     @Test
     void rejectsTruncatedOrNonCbeReferences() {

@@ -33,16 +33,19 @@ public class MediaController {
     private final ObjectStorageService storageService;
     private final MessageRepository messageRepository;
     private final ChatThreadRepository threadRepository;
+    private final com.velvet.api.identity.service.ProfileService profileService;
     private final AntPathMatcher pathMatcher = new AntPathMatcher();
 
     public MediaController(
             ObjectStorageService storageService,
             MessageRepository messageRepository,
-            ChatThreadRepository threadRepository
+            ChatThreadRepository threadRepository,
+            com.velvet.api.identity.service.ProfileService profileService
     ) {
         this.storageService = storageService;
         this.messageRepository = messageRepository;
         this.threadRepository = threadRepository;
+        this.profileService = profileService;
     }
 
     @GetMapping("/**")
@@ -104,6 +107,22 @@ public class MediaController {
             }
             throw new BusinessException("FORBIDDEN", "You do not have access to this media.");
         }
+        if (key.startsWith("vault/")) {
+            if (key.contains("/" + userId + "/")) {
+                return;
+            }
+            // Key format: vault/<performerUserId>/<filename>
+            String[] parts = key.split("/");
+            if (parts.length >= 2) {
+                try {
+                    UUID performerId = UUID.fromString(parts[1]);
+                    if (profileService.hasVaultAccess(performerId, userId)) {
+                        return;
+                    }
+                } catch (IllegalArgumentException ignored) {}
+            }
+            throw new BusinessException("FORBIDDEN", "Vault access permission required to view this photo.");
+        }
         if (key.startsWith("chat/")) {
             String relativeUrl = "/v1/media/" + key;
             boolean participant = messageRepository.findForMediaKey(relativeUrl, key).stream()
@@ -116,6 +135,7 @@ public class MediaController {
         }
         throw new BusinessException("FORBIDDEN", "You do not have access to this media.");
     }
+
 
     private static boolean isParticipant(ChatThreadEntity thread, UUID userId) {
         return userId.equals(thread.getMemberAId()) || userId.equals(thread.getMemberBId());

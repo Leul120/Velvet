@@ -47,6 +47,8 @@ public class BookingService {
     private final AvailabilityService availabilityService;
     private final com.velvet.api.billing.service.BillingService billingService;
     private final com.velvet.api.safety.repo.TripShareRepository tripShareRepository;
+    private final com.velvet.api.identity.repo.EmergencyContactRepository emergencyContactRepository;
+    private final com.velvet.api.notify.sms.SmsGateway smsGateway;
 
     public BookingService(
             BookingRepository bookingRepository,
@@ -61,8 +63,12 @@ public class BookingService {
             BlockService blockService,
             AvailabilityService availabilityService,
             @org.springframework.context.annotation.Lazy com.velvet.api.billing.service.BillingService billingService,
-            com.velvet.api.safety.repo.TripShareRepository tripShareRepository
+            com.velvet.api.safety.repo.TripShareRepository tripShareRepository,
+            com.velvet.api.identity.repo.EmergencyContactRepository emergencyContactRepository,
+            com.velvet.api.notify.sms.SmsGateway smsGateway
     ) {
+
+
         this.bookingRepository = bookingRepository;
         this.feedbackRepository = feedbackRepository;
         this.connectionRepository = connectionRepository;
@@ -76,6 +82,8 @@ public class BookingService {
         this.availabilityService = availabilityService;
         this.billingService = billingService;
         this.tripShareRepository = tripShareRepository;
+        this.emergencyContactRepository = emergencyContactRepository;
+        this.smsGateway = smsGateway;
     }
 
     @Transactional
@@ -390,9 +398,19 @@ public class BookingService {
             booking.setCheckedInAt(Instant.now());
             booking.setStatus(BookingStatus.CHECKED_IN);
             bookingRepository.save(booking);
+
+            // Dispatch SMS beacon to enabled emergency contacts
+            List<com.velvet.api.identity.domain.EmergencyContactEntity> contacts = emergencyContactRepository.findByUserIdAndEnabledTrue(userId);
+            for (com.velvet.api.identity.domain.EmergencyContactEntity c : contacts) {
+                String sms = "VELVET Safety Beacon: Meeting checked in at %s. Live safety monitoring active."
+                        .formatted(placeLabel(booking, venue));
+                smsGateway.send(c.getContactPhone(), sms);
+            }
+
         }
         return toResponse(booking, venue, userId);
     }
+
 
     private void assertWithinGeofence(VenueEntity venue, BookingDtos.CheckInRequest request) {
         boolean require = properties.concierge() != null && properties.concierge().requireGeofence();
@@ -450,6 +468,7 @@ public class BookingService {
         if (booking.getPerformerCheckedOutAt() != null && booking.getClientCheckedOutAt() != null) {
             booking.setCheckedOutAt(now);
             booking.setStatus(BookingStatus.COMPLETED);
+            booking.setEscrowReleaseAt(now.plus(24, ChronoUnit.HOURS));
         }
         bookingRepository.save(booking);
         if (booking.getStatus() == BookingStatus.COMPLETED) {
@@ -457,6 +476,29 @@ public class BookingService {
         }
         return toResponse(booking, optionalVenue(booking.getVenueId()), userId);
     }
+
+    @Transactional
+    public BookingDtos.BookingResponse disputeBooking(UUID userId, UUID bookingId, String notes) {
+        BookingEntity booking = requireParticipantBooking(userId, bookingId);
+        if (booking.getStatus() != BookingStatus.COMPLETED && booking.getStatus() != BookingStatus.CHECKED_IN) {
+            throw new BusinessException("INVALID_STATUS", "Disputes can be filed on active or completed bookings.");
+        }
+        if (booking.getEscrowReleasedAt() != null) {
+            throw new BusinessException("ESCROW_ALREADY_RELEASED", "Escrow for this booking has already been released.");
+        }
+        booking.setDisputedAt(Instant.now());
+        booking.setDisputeNotes(notes == null ? "Member filed dispute" : notes.trim());
+        bookingRepository.save(booking);
+
+        conciergeNotifyService.notifyOps(
+                "BOOKING_DISPUTED",
+                "Dispute filed for booking " + bookingId + ": " + (notes == null ? "" : notes),
+                "BOOKING",
+                bookingId.toString()
+        );
+        return toResponse(booking, optionalVenue(booking.getVenueId()), userId);
+    }
+
 
     @Transactional
     public BookingDtos.FeedbackResponse submitFeedback(UUID userId, UUID bookingId, BookingDtos.FeedbackRequest request) {
@@ -483,7 +525,29 @@ public class BookingService {
                     "MEETING_FEEDBACK",
                     saved.getId().toString()
             );
+
+            ConnectionEntity match = connectionRepository.findById(booking.getConnectionId()).orElse(null);
+            if (match != null) {
+                UUID targetId = match.getMemberAId().equals(userId) ? match.getMemberBId() : match.getMemberAId();
+                UserEntity target = userRepository.findById(targetId).orElse(null);
+                if (target != null && target.getRole() == com.velvet.api.identity.domain.UserRole.CLIENT) {
+                    long unsafeCount = feedbackRepository.findAll().stream()
+                            .filter(f -> !f.isFeltSafe())
+                            .count();
+                    if (unsafeCount >= 2) {
+                        target.setStatus(com.velvet.api.identity.domain.UserStatus.SUSPENDED);
+                        userRepository.save(target);
+                        conciergeNotifyService.notifyOps(
+                                "CLIENT_AUTO_SUSPENDED",
+                                "Client " + target.getDisplayName() + " (" + target.getPhoneE164() + ") auto-suspended due to 2+ safety flags.",
+                                "USER",
+                                targetId.toString()
+                        );
+                    }
+                }
+            }
         }
+
         return new BookingDtos.FeedbackResponse(
                 saved.getId().toString(),
                 bookingId.toString(),

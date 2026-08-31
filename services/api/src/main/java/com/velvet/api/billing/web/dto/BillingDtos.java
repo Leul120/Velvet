@@ -69,6 +69,9 @@ public final class BillingDtos {
     public record PaymentIntentAdminItem(
             String id,
             String userId,
+            String userName,
+            String userPhone,
+            String userRole,
             String purpose,
             String bookingId,
             String provider,
@@ -81,6 +84,7 @@ public final class BillingDtos {
             Instant createdAt,
             Instant paidAt
     ) {}
+
 
     public record AdminPaymentDecisionRequest(
             @Size(max = 256) String notes

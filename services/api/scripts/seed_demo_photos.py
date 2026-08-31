@@ -136,13 +136,19 @@ def normalize_image(data: bytes) -> bytes:
 
 
 def s3_client():
+    # Newer botocore default checksums break PutObject against MinIO (HTTP 403).
     return boto3.client(
         "s3",
         endpoint_url=S3_ENDPOINT,
         aws_access_key_id=S3_ACCESS_KEY,
         aws_secret_access_key=S3_SECRET_KEY,
         region_name="us-east-1",
-        config=Config(signature_version="s3v4", s3={"addressing_style": "path"}),
+        config=Config(
+            signature_version="s3v4",
+            s3={"addressing_style": "path"},
+            request_checksum_calculation="when_required",
+            response_checksum_validation="when_required",
+        ),
     )
 
 
@@ -163,10 +169,23 @@ def upload_photo(client, key: str, body: bytes) -> None:
     )
 
 
+def picsum_pool() -> list[str]:
+    """Deterministic portrait placeholders when Unsplash is blocked."""
+    return [
+        f"https://picsum.photos/seed/velvet{n:04d}/900/1200.jpg"
+        for n in range(1, TOTAL + 80)
+    ]
+
+
 def main() -> None:
     print(f"Collecting {TOTAL} Unsplash beach portraits…")
-    pool = fetch_unsplash_pool()
-    print(f"  found {len(pool)} candidates")
+    try:
+        pool = fetch_unsplash_pool()
+        print(f"  found {len(pool)} candidates")
+    except Exception as exc:
+        print(f"  Unsplash unavailable ({exc}); falling back to Picsum portraits", file=sys.stderr)
+        pool = picsum_pool()
+        print(f"  using {len(pool)} Picsum candidates")
 
     client = s3_client()
     ensure_bucket(client)
@@ -178,6 +197,7 @@ def main() -> None:
         "version": 1,
         "bucket": S3_BUCKET,
         "women": {},
+        "source": "unsplash" if "unsplash.com" in (pool[0] if pool else "") else "picsum",
     }
     cursor = 0
     uploaded = 0
@@ -188,11 +208,12 @@ def main() -> None:
             key = demo_photo_key(woman_n, photo_i)
             url = demo_photo_url(woman_n, photo_i)
 
+            body = None
             while cursor < len(pool):
                 src = pool[cursor]
                 cursor += 1
                 try:
-                    resp = session.get(src, timeout=45)
+                    resp = session.get(src, timeout=45, allow_redirects=True)
                     resp.raise_for_status()
                     if len(resp.content) < 8000:
                         continue
@@ -201,8 +222,8 @@ def main() -> None:
                 except Exception as exc:
                     print(f"  skip download: {exc}", file=sys.stderr)
                     body = None
-            else:
-                raise RuntimeError("Ran out of Unsplash candidates while downloading.")
+            if body is None:
+                raise RuntimeError("Ran out of image candidates while downloading.")
 
             upload_photo(client, key, body)
             urls.append(url)

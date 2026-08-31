@@ -41,4 +41,7 @@ public interface BookingRepository extends JpaRepository<BookingEntity, UUID> {
             BookingStatus status,
             Instant before
     );
+
+    List<BookingEntity> findByEscrowReleaseAtBeforeAndEscrowReleasedAtIsNullAndDisputedAtIsNull(Instant now);
+
 }

@@ -53,9 +53,20 @@ public class MemberProfileEntity {
     @Column(name = "availability_note", length = 280)
     private String availabilityNote;
 
+    @Column(name = "available_tonight", nullable = false)
+    @Builder.Default
+    private boolean availableTonight = false;
+
+    @Column(name = "available_neighborhood", length = 64)
+    private String availableNeighborhood;
+
+    @Column(name = "voice_intro_url", length = 1024)
+    private String voiceIntroUrl;
+
     @Column(name = "listing_active", nullable = false)
     @Builder.Default
     private boolean listingActive = true;
+
 
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(nullable = false, columnDefinition = "jsonb")
@@ -66,6 +77,12 @@ public class MemberProfileEntity {
     @Column(name = "photo_urls", nullable = false, columnDefinition = "jsonb")
     @Builder.Default
     private List<String> photoUrls = new ArrayList<>();
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "private_photo_urls", nullable = false, columnDefinition = "jsonb")
+    @Builder.Default
+    private List<String> privatePhotoUrls = new ArrayList<>();
+
 
     @Column(name = "concierge_notes", columnDefinition = "TEXT")
     private String conciergeNotes;
