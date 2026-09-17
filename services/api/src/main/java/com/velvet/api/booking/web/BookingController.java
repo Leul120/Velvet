@@ -76,6 +76,16 @@ public class BookingController {
         return ResponseEntity.ok(bookingService.checkOut(principal.getUserId(), id));
     }
 
+    @PostMapping("/{id}/dispute")
+    public ResponseEntity<BookingDtos.BookingResponse> dispute(
+            @AuthenticationPrincipal VelvetPrincipal principal,
+            @PathVariable UUID id,
+            @RequestBody(required = false) BookingDtos.DisputeRequest request
+    ) {
+        String notes = request == null ? null : request.notes();
+        return ResponseEntity.ok(bookingService.disputeBooking(principal.getUserId(), id, notes));
+    }
+
     @PostMapping("/{id}/feedback")
     public ResponseEntity<BookingDtos.FeedbackResponse> feedback(
             @AuthenticationPrincipal VelvetPrincipal principal,

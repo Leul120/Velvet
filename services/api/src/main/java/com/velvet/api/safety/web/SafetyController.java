@@ -76,4 +76,37 @@ public class SafetyController {
         blockService.unblock(principal.getUserId(), blockedUserId);
         return ResponseEntity.ok(Map.of("status", "UNBLOCKED"));
     }
+
+    @GetMapping("/emergency-contacts")
+    public ResponseEntity<List<SafetyDtos.EmergencyContactResponse>> listEmergencyContacts(
+            @AuthenticationPrincipal VelvetPrincipal principal
+    ) {
+        return ResponseEntity.ok(safetyService.listEmergencyContacts(principal.getUserId()));
+    }
+
+    @PostMapping("/emergency-contacts")
+    public ResponseEntity<SafetyDtos.EmergencyContactResponse> addEmergencyContact(
+            @AuthenticationPrincipal VelvetPrincipal principal,
+            @Valid @RequestBody SafetyDtos.EmergencyContactRequest request
+    ) {
+        return ResponseEntity.ok(safetyService.addEmergencyContact(principal.getUserId(), request));
+    }
+
+    @PatchMapping("/emergency-contacts/{id}")
+    public ResponseEntity<SafetyDtos.EmergencyContactResponse> updateEmergencyContact(
+            @AuthenticationPrincipal VelvetPrincipal principal,
+            @PathVariable UUID id,
+            @Valid @RequestBody SafetyDtos.UpdateEmergencyContactRequest request
+    ) {
+        return ResponseEntity.ok(safetyService.updateEmergencyContact(principal.getUserId(), id, request));
+    }
+
+    @DeleteMapping("/emergency-contacts/{id}")
+    public ResponseEntity<Map<String, String>> deleteEmergencyContact(
+            @AuthenticationPrincipal VelvetPrincipal principal,
+            @PathVariable UUID id
+    ) {
+        safetyService.deleteEmergencyContact(principal.getUserId(), id);
+        return ResponseEntity.ok(Map.of("status", "DELETED"));
+    }
 }

@@ -36,7 +36,11 @@ public final class DiscoverDtos {
             String likedPromptKey,
             String likedPhotoUrl,
             String likeReason,
-            Integer trustScore
+            Integer trustScore,
+            String voiceIntroUrl,
+            boolean availableTonight,
+            String availableNeighborhood,
+            boolean hasVault
     ) {}
 
     public record DiscoverFeedResponse(List<DiscoverCard> items, String mode) {}

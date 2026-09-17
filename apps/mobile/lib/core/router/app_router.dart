@@ -23,6 +23,7 @@ import 'package:velvet_mobile/features/onboarding/onboarding_prefs.dart';
 import 'package:velvet_mobile/features/notifications/notifications_screen.dart';
 import 'package:velvet_mobile/features/profile/profile_screen.dart';
 import 'package:velvet_mobile/features/safety/blocked_members_screen.dart';
+import 'package:velvet_mobile/features/safety/emergency_contacts_screen.dart';
 import 'package:velvet_mobile/features/safety/safety_center_screen.dart';
 import 'package:velvet_mobile/features/social/booking_screen.dart';
 import 'package:velvet_mobile/features/social/chat_screen.dart';
@@ -231,6 +232,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/safety',
         builder: (context, state) => const SafetyCenterScreen(),
+      ),
+      GoRoute(
+        path: '/emergency-contacts',
+        builder: (context, state) => const EmergencyContactsScreen(),
       ),
       GoRoute(
         path: '/verification',

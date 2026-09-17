@@ -4,6 +4,7 @@ import com.velvet.api.billing.domain.LedgerEntryEntity;
 import com.velvet.api.billing.domain.PaymentIntentEntity;
 import com.velvet.api.billing.domain.PayoutRequestEntity;
 import com.velvet.api.billing.repo.LedgerEntryRepository;
+import com.velvet.api.billing.repo.PaymentIntentRepository;
 import com.velvet.api.billing.repo.PayoutRequestRepository;
 import com.velvet.api.billing.web.dto.EarningsDtos;
 import com.velvet.api.booking.domain.BookingEntity;
@@ -33,6 +34,7 @@ public class EarningsService {
 
     private final LedgerEntryRepository ledgerEntryRepository;
     private final PayoutRequestRepository payoutRequestRepository;
+    private final PaymentIntentRepository paymentIntentRepository;
     private final UserRepository userRepository;
     private final ConnectionRepository connectionRepository;
     private final com.velvet.api.booking.repo.BookingRepository bookingRepository;
@@ -42,6 +44,7 @@ public class EarningsService {
     public EarningsService(
             LedgerEntryRepository ledgerEntryRepository,
             PayoutRequestRepository payoutRequestRepository,
+            PaymentIntentRepository paymentIntentRepository,
             UserRepository userRepository,
             ConnectionRepository connectionRepository,
             com.velvet.api.booking.repo.BookingRepository bookingRepository,
@@ -50,6 +53,7 @@ public class EarningsService {
     ) {
         this.ledgerEntryRepository = ledgerEntryRepository;
         this.payoutRequestRepository = payoutRequestRepository;
+        this.paymentIntentRepository = paymentIntentRepository;
         this.userRepository = userRepository;
         this.connectionRepository = connectionRepository;
         this.bookingRepository = bookingRepository;
@@ -67,12 +71,12 @@ public class EarningsService {
         Instant now = Instant.now();
         List<BookingEntity> ready = bookingRepository.findByEscrowReleaseAtBeforeAndEscrowReleasedAtIsNullAndDisputedAtIsNull(now);
         for (BookingEntity booking : ready) {
-            if (booking.getAmountEtb() != null && booking.getAmountEtb() > 0) {
-                PaymentIntentEntity dummyIntent = PaymentIntentEntity.builder()
-                        .amountEtb(BigDecimal.valueOf(booking.getAmountEtb()))
-                        .build();
-
-                creditPerformerForPaidBooking(booking, dummyIntent);
+            if ("PAID".equals(booking.getPaymentStatus()) && booking.getPaymentIntentId() != null) {
+                paymentIntentRepository.findById(booking.getPaymentIntentId()).ifPresent(intent -> {
+                    if (intent.getStatus() == com.velvet.api.billing.domain.PaymentStatus.PAID) {
+                        creditPerformerForPaidBooking(booking, intent);
+                    }
+                });
             }
             booking.setEscrowReleasedAt(now);
             bookingRepository.save(booking);

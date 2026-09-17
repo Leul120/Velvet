@@ -31,8 +31,12 @@ class MeProfile {
     this.sessionRateEtb,
     this.overnightRateEtb,
     this.availabilityNote,
+    this.availableTonight = false,
+    this.availableNeighborhood,
+    this.voiceIntroUrl,
     this.listingActive = true,
     this.photoUrls = const [],
+    this.privatePhotoUrls = const [],
     this.interests = const [],
     this.trustScore,
   });
@@ -58,8 +62,12 @@ class MeProfile {
   final int? sessionRateEtb;
   final int? overnightRateEtb;
   final String? availabilityNote;
+  final bool availableTonight;
+  final String? availableNeighborhood;
+  final String? voiceIntroUrl;
   final bool listingActive;
   final List<String> photoUrls;
+  final List<String> privatePhotoUrls;
   final List<String> interests;
   final int? trustScore;
 
@@ -88,8 +96,12 @@ class MeProfile {
       sessionRateEtb: (profile['sessionRateEtb'] as num?)?.toInt(),
       overnightRateEtb: (profile['overnightRateEtb'] as num?)?.toInt(),
       availabilityNote: profile['availabilityNote'] as String?,
+      availableTonight: profile['availableTonight'] as bool? ?? false,
+      availableNeighborhood: profile['availableNeighborhood'] as String?,
+      voiceIntroUrl: profile['voiceIntroUrl'] as String?,
       listingActive: profile['listingActive'] as bool? ?? true,
       photoUrls: (profile['photoUrls'] as List<dynamic>? ?? []).cast<String>(),
+      privatePhotoUrls: (profile['privatePhotoUrls'] as List<dynamic>? ?? []).cast<String>(),
       interests: interests is List
           ? interests.map((e) => e.toString()).toList()
           : const [],
@@ -183,6 +195,68 @@ class ProfileApi {
     final res = await _dio.put(
       '/v1/me/photos/order',
       data: {'photoUrls': photoUrls},
+    );
+    return MeProfile.fromJson(res.data as Map<String, dynamic>);
+  }
+
+  Future<String> uploadVaultPhoto(String filePath) async {
+    final name = filePath.split('/').last;
+    final form = FormData.fromMap({
+      'file': await MultipartFile.fromFile(
+        filePath,
+        filename: name,
+        contentType: mediaTypeForPath(filePath) ?? MediaType('image', 'jpeg'),
+      ),
+    });
+    final res = await _dio.post('/v1/uploads/vault', data: form);
+    final data = res.data as Map<String, dynamic>;
+    return data['url'] as String;
+  }
+
+  Future<MeProfile> addVaultPhoto(String url) async {
+    final res = await _dio.post('/v1/me/vault/photos', data: {'url': url});
+    return MeProfile.fromJson(res.data as Map<String, dynamic>);
+  }
+
+  Future<MeProfile> removeVaultPhoto(String url) async {
+    final res = await _dio.delete('/v1/me/vault/photos', data: {'url': url});
+    return MeProfile.fromJson(res.data as Map<String, dynamic>);
+  }
+
+  Future<String> uploadVoiceIntro(String filePath) async {
+    final name = filePath.split('/').last;
+    final form = FormData.fromMap({
+      'file': await MultipartFile.fromFile(
+        filePath,
+        filename: name,
+        contentType: mediaTypeForPath(filePath) ?? MediaType('audio', 'm4a'),
+      ),
+    });
+    final res = await _dio.post('/v1/uploads/voice', data: form);
+    final data = res.data as Map<String, dynamic>;
+    return data['url'] as String;
+  }
+
+  Future<MeProfile> setVoiceIntro(String url) async {
+    final res = await _dio.post('/v1/me/voice-intro', data: {'voiceIntroUrl': url});
+    return MeProfile.fromJson(res.data as Map<String, dynamic>);
+  }
+
+  Future<MeProfile> removeVoiceIntro() async {
+    final res = await _dio.delete('/v1/me/voice-intro');
+    return MeProfile.fromJson(res.data as Map<String, dynamic>);
+  }
+
+  Future<MeProfile> toggleAvailableTonight({
+    required bool availableTonight,
+    String? availableNeighborhood,
+  }) async {
+    final res = await _dio.post(
+      '/v1/me/available-tonight',
+      data: {
+        'availableTonight': availableTonight,
+        'availableNeighborhood': availableNeighborhood ?? '',
+      },
     );
     return MeProfile.fromJson(res.data as Map<String, dynamic>);
   }

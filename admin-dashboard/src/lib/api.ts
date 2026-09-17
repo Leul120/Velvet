@@ -1,4 +1,14 @@
-import { PaymentIntentAdminItem, MemberSummary, PanicAlert, SafetyReport, VenueAdminResponse, InviteResponse } from './types';
+import { 
+  PaymentIntentAdminItem, 
+  MemberSummary, 
+  PanicAlert, 
+  SafetyReport, 
+  VenueAdminResponse, 
+  InviteResponse,
+  AdminPayoutItem,
+  PhotoReviewItem,
+  VerificationCaseItem
+} from './types';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080';
 
@@ -64,18 +74,32 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
 
-export async function requestOtp(phone: string) {
-  return request<{ status: string; codeExposed?: string }>('/v1/auth/otp/request', {
+export async function requestOtp(phone: string, inviteCode: string = 'VELVET-SEED') {
+  const res = await request<{ message?: string; status?: string; devOtp?: string; codeExposed?: string }>('/v1/auth/otp/request', {
     method: 'POST',
-    body: JSON.stringify({ phone }),
+    body: JSON.stringify({ phone, inviteCode }),
   });
+  return {
+    status: res.message || res.status || 'OTP sent',
+    codeExposed: res.devOtp || res.codeExposed,
+  };
 }
 
-export async function verifyOtp(phone: string, code: string) {
-  return request<{ accessToken: string; userId: string; role: string }>('/v1/auth/otp/verify', {
+export async function verifyOtp(phone: string, code: string, acceptedLegalVersion: string = 'v2-2026-08') {
+  const res = await request<{
+    accessToken: string;
+    userId?: string;
+    role?: string;
+    user?: { id: string; role: string; phone?: string; displayName?: string };
+  }>('/v1/auth/otp/verify', {
     method: 'POST',
-    body: JSON.stringify({ phone, code }),
+    body: JSON.stringify({ phone, code, acceptedLegalVersion }),
   });
+  return {
+    accessToken: res.accessToken,
+    userId: res.userId || res.user?.id || '',
+    role: res.role || res.user?.role || 'ADMIN',
+  };
 }
 
 // ── Payments ──────────────────────────────────────────────────────────────────
@@ -156,5 +180,53 @@ export async function createInvite(code: string, maxUses = 100) {
   return request<InviteResponse>('/v1/admin/invites', {
     method: 'POST',
     body: JSON.stringify({ code, maxUses }),
+  });
+}
+
+// ── Payouts ───────────────────────────────────────────────────────────────────
+
+export async function fetchPayouts(status?: string) {
+  const query = new URLSearchParams();
+  if (status && status !== 'ALL') query.set('status', status);
+  return request<AdminPayoutItem[]>(`/v1/admin/payouts?${query.toString()}`);
+}
+
+export async function completePayout(id: string, notes?: string) {
+  return request<AdminPayoutItem>(`/v1/admin/payouts/${id}/complete`, {
+    method: 'POST',
+    body: JSON.stringify({ notes: notes || 'Paid via Bank Transfer' }),
+  });
+}
+
+export async function rejectPayout(id: string, notes?: string) {
+  return request<AdminPayoutItem>(`/v1/admin/payouts/${id}/reject`, {
+    method: 'POST',
+    body: JSON.stringify({ notes: notes || 'Rejected by Admin' }),
+  });
+}
+
+// ── Photo Review Queue ────────────────────────────────────────────────────────
+
+export async function fetchPhotoReviewQueue() {
+  return request<PhotoReviewItem[]>('/v1/admin/photos/review-queue');
+}
+
+export async function reviewMemberPhotos(userId: string, approve: boolean, notes?: string) {
+  return request<PhotoReviewItem>(`/v1/admin/members/${userId}/photos/review`, {
+    method: 'POST',
+    body: JSON.stringify({ approve, notes: notes || '' }),
+  });
+}
+
+// ── Verification Queue ────────────────────────────────────────────────────────
+
+export async function fetchVerificationQueue() {
+  return request<VerificationCaseItem[]>('/v1/admin/verification/queue');
+}
+
+export async function reviewVerificationCase(caseId: string, approve: boolean, notes?: string) {
+  return request<VerificationCaseItem>(`/v1/admin/verification/${caseId}/review`, {
+    method: 'POST',
+    body: JSON.stringify({ approve, notes: notes || '' }),
   });
 }

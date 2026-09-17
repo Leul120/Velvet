@@ -263,9 +263,15 @@ class _SafetyCenterScreenState extends ConsumerState<SafetyCenterScreen> {
                       onTap: () => context.push('/blocked'),
                     ),
                     EditorialNavSlab(
+                      title: 'Emergency Contacts',
+                      icon: Icons.contact_phone_outlined,
+                      index: 1,
+                      onTap: () => context.push('/emergency-contacts'),
+                    ),
+                    EditorialNavSlab(
                       title: l10n.verificationTitle,
                       icon: Icons.verified_user_outlined,
-                      index: 1,
+                      index: 2,
                       onTap: () => context.push('/verification'),
                     ),
                   ],

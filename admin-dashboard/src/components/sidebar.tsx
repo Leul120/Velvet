@@ -10,13 +10,19 @@ import {
   ShieldAlert, 
   Building2, 
   LogOut, 
-  Crown
+  Crown,
+  Banknote,
+  Camera,
+  BadgeCheck
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
 
 const navigation = [
   { name: 'Overview', href: '/', icon: LayoutDashboard },
   { name: 'Payment Queue', href: '/payments', icon: CreditCard, badge: 'CBE Review' },
+  { name: 'Payouts', href: '/payouts', icon: Banknote },
+  { name: 'ID Verification', href: '/verification', icon: BadgeCheck, badge: 'ID' },
+  { name: 'Photo Review', href: '/photos', icon: Camera },
   { name: 'Members', href: '/members', icon: Users },
   { name: 'Safety & Panics', href: '/safety', icon: ShieldAlert },
   { name: 'Venues & Invites', href: '/venues', icon: Building2 },

@@ -606,7 +606,11 @@ public class DiscoverService {
                 like == null ? null : like.likedPromptKey(),
                 like == null ? null : like.likedPhotoUrl(),
                 like == null ? null : like.likeReason(),
-                trustService.getTrustScore(user.getId())
+                trustService.getTrustScore(user.getId()),
+                profile.getVoiceIntroUrl(),
+                profile.isAvailableTonight(),
+                profile.getAvailableNeighborhood(),
+                profile.getPrivatePhotoUrls() != null && !profile.getPrivatePhotoUrls().isEmpty()
         );
     }
 

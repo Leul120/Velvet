@@ -32,6 +32,10 @@ class DiscoverCard {
     this.likedPhotoUrl,
     this.likeReason,
     this.trustScore,
+    this.voiceIntroUrl,
+    this.availableTonight = false,
+    this.availableNeighborhood,
+    this.hasVault = false,
   });
 
   final String userId;
@@ -58,6 +62,10 @@ class DiscoverCard {
   final String? likedPhotoUrl;
   final String? likeReason;
   final int? trustScore;
+  final String? voiceIntroUrl;
+  final bool availableTonight;
+  final String? availableNeighborhood;
+  final bool hasVault;
 
   factory DiscoverCard.fromJson(Map<String, dynamic> json) {
     final photos = json['photoUrls'];
@@ -91,6 +99,10 @@ class DiscoverCard {
       likedPhotoUrl: json['likedPhotoUrl'] as String?,
       likeReason: json['likeReason'] as String?,
       trustScore: json['trustScore'] as int?,
+      voiceIntroUrl: json['voiceIntroUrl'] as String?,
+      availableTonight: json['availableTonight'] as bool? ?? false,
+      availableNeighborhood: json['availableNeighborhood'] as String?,
+      hasVault: json['hasVault'] as bool? ?? false,
     );
   }
 }
