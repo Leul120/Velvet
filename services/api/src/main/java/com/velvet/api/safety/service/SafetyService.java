@@ -31,6 +31,7 @@ public class SafetyService {
     private final PanicAlertRepository panicRepository;
     private final SafetyReportRepository reportRepository;
     private final TripShareRepository tripShareRepository;
+    private final com.velvet.api.identity.repo.EmergencyContactRepository emergencyContactRepository;
     private final ConciergeNotifyService conciergeNotifyService;
     private final RateLimitService rateLimitService;
 
@@ -38,12 +39,14 @@ public class SafetyService {
             PanicAlertRepository panicRepository,
             SafetyReportRepository reportRepository,
             TripShareRepository tripShareRepository,
+            com.velvet.api.identity.repo.EmergencyContactRepository emergencyContactRepository,
             ConciergeNotifyService conciergeNotifyService,
             RateLimitService rateLimitService
     ) {
         this.panicRepository = panicRepository;
         this.reportRepository = reportRepository;
         this.tripShareRepository = tripShareRepository;
+        this.emergencyContactRepository = emergencyContactRepository;
         this.conciergeNotifyService = conciergeNotifyService;
         this.rateLimitService = rateLimitService;
     }
@@ -169,5 +172,66 @@ public class SafetyService {
             report.setStaffNotes(notes.trim());
         }
         return reportRepository.save(report);
+    }
+
+    @Transactional(readOnly = true)
+    public List<SafetyDtos.EmergencyContactResponse> listEmergencyContacts(UUID userId) {
+        return emergencyContactRepository.findByUserId(userId).stream()
+                .map(this::toEmergencyContactResponse)
+                .toList();
+    }
+
+    @Transactional
+    public SafetyDtos.EmergencyContactResponse addEmergencyContact(UUID userId, SafetyDtos.EmergencyContactRequest req) {
+        List<com.velvet.api.identity.domain.EmergencyContactEntity> existing = emergencyContactRepository.findByUserId(userId);
+        if (existing.size() >= 5) {
+            throw new BusinessException("LIMIT_REACHED", "You can have a maximum of 5 emergency contacts.");
+        }
+        com.velvet.api.identity.domain.EmergencyContactEntity contact = com.velvet.api.identity.domain.EmergencyContactEntity.builder()
+                .userId(userId)
+                .contactName(req.contactName().trim())
+                .contactPhone(req.contactPhone().trim())
+                .enabled(req.enabled() == null ? true : req.enabled())
+                .build();
+        return toEmergencyContactResponse(emergencyContactRepository.save(contact));
+    }
+
+    @Transactional
+    public SafetyDtos.EmergencyContactResponse updateEmergencyContact(UUID userId, UUID contactId, SafetyDtos.UpdateEmergencyContactRequest req) {
+        com.velvet.api.identity.domain.EmergencyContactEntity contact = emergencyContactRepository.findById(contactId)
+                .orElseThrow(() -> new BusinessException("NOT_FOUND", "Emergency contact not found."));
+        if (!contact.getUserId().equals(userId)) {
+            throw new BusinessException("FORBIDDEN", "You do not own this emergency contact.");
+        }
+        if (req.contactName() != null && !req.contactName().isBlank()) {
+            contact.setContactName(req.contactName().trim());
+        }
+        if (req.contactPhone() != null && !req.contactPhone().isBlank()) {
+            contact.setContactPhone(req.contactPhone().trim());
+        }
+        if (req.enabled() != null) {
+            contact.setEnabled(req.enabled());
+        }
+        return toEmergencyContactResponse(emergencyContactRepository.save(contact));
+    }
+
+    @Transactional
+    public void deleteEmergencyContact(UUID userId, UUID contactId) {
+        com.velvet.api.identity.domain.EmergencyContactEntity contact = emergencyContactRepository.findById(contactId)
+                .orElseThrow(() -> new BusinessException("NOT_FOUND", "Emergency contact not found."));
+        if (!contact.getUserId().equals(userId)) {
+            throw new BusinessException("FORBIDDEN", "You do not own this emergency contact.");
+        }
+        emergencyContactRepository.delete(contact);
+    }
+
+    private SafetyDtos.EmergencyContactResponse toEmergencyContactResponse(com.velvet.api.identity.domain.EmergencyContactEntity c) {
+        return new SafetyDtos.EmergencyContactResponse(
+                c.getId().toString(),
+                c.getContactName(),
+                c.getContactPhone(),
+                c.isEnabled(),
+                c.getCreatedAt()
+        );
     }
 }

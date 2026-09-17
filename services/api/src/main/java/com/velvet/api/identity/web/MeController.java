@@ -71,6 +71,14 @@ public class MeController {
         return ResponseEntity.ok(profileService.addPrivatePhoto(principal.getUserId(), request));
     }
 
+    @DeleteMapping("/vault/photos")
+    public ResponseEntity<ProfileDtos.MeResponse> removePrivatePhoto(
+            @AuthenticationPrincipal VelvetPrincipal principal,
+            @Valid @RequestBody ProfileDtos.RemovePhotoRequest request
+    ) {
+        return ResponseEntity.ok(profileService.removePrivatePhoto(principal.getUserId(), request.url()));
+    }
+
     @PostMapping("/vault/grant")
     public ResponseEntity<Map<String, String>> grantVaultAccess(
             @AuthenticationPrincipal VelvetPrincipal principal,
@@ -94,6 +102,13 @@ public class MeController {
             @Valid @RequestBody ProfileDtos.UploadVoiceIntroRequest request
     ) {
         return ResponseEntity.ok(profileService.setVoiceIntro(principal.getUserId(), request));
+    }
+
+    @DeleteMapping("/voice-intro")
+    public ResponseEntity<ProfileDtos.MeResponse> clearVoiceIntro(
+            @AuthenticationPrincipal VelvetPrincipal principal
+    ) {
+        return ResponseEntity.ok(profileService.clearVoiceIntro(principal.getUserId()));
     }
 
 

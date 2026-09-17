@@ -71,4 +71,22 @@ public class UploadController {
                 "fileName", stored.fileName() == null ? "file" : stored.fileName()
         ));
     }
+
+    @PostMapping(value = "/vault", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<Map<String, String>> uploadVault(
+            @AuthenticationPrincipal VelvetPrincipal principal,
+            @RequestParam("file") MultipartFile file
+    ) {
+        String url = storageService.uploadVaultImage(principal.getUserId(), file);
+        return ResponseEntity.ok(Map.of("url", url));
+    }
+
+    @PostMapping(value = "/voice", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<Map<String, String>> uploadVoice(
+            @AuthenticationPrincipal VelvetPrincipal principal,
+            @RequestParam("file") MultipartFile file
+    ) {
+        String url = storageService.uploadVoiceIntro(principal.getUserId(), file);
+        return ResponseEntity.ok(Map.of("url", url));
+    }
 }

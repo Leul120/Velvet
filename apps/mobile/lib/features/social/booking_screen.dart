@@ -596,6 +596,10 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
           reminder24hSentAt: booking.reminder24hSentAt,
           reminder2hSentAt: booking.reminder2hSentAt,
           feedbackSubmitted: true,
+          escrowReleaseAt: booking.escrowReleaseAt,
+          escrowReleasedAt: booking.escrowReleasedAt,
+          disputedAt: booking.disputedAt,
+          disputeNotes: booking.disputeNotes,
         );
       });
       if (mounted) {
@@ -611,6 +615,40 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
       }
     } finally {
       notesCtrl.dispose();
+    }
+  }
+
+  Future<void> _disputeBooking(BookingItem booking) async {
+    final reason = await showEditorialPrompt(
+      context: context,
+      title: 'File Booking Dispute',
+      fieldLabel: 'Reason for dispute',
+      helperText:
+          'Describe the safety or booking issue. This pauses escrow payout immediately.',
+      confirmLabel: 'Submit dispute',
+      cancelLabel: 'Cancel',
+    );
+    if (reason == null || reason.trim().isEmpty) return;
+    setState(() => _actioning = true);
+    try {
+      final b = await ref
+          .read(bookingApiProvider)
+          .dispute(booking.id, notes: reason.trim());
+      HapticFeedback.mediumImpact();
+      _setBookingWithPulse(b);
+      if (mounted) {
+        await showVelvetToast(
+          context,
+          message: 'Dispute submitted. Escrow hold applied.',
+          icon: Icons.shield_outlined,
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        showVelvetErrorToast(context, message: apiErrorMessage(e));
+      }
+    } finally {
+      if (mounted) setState(() => _actioning = false);
     }
   }
 
@@ -994,6 +1032,21 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
                               onPressed: _actioning
                                   ? null
                                   : () async {
+                                      // If meeting at a private place without a partner venue, prompt safety beacon
+                                      if (booking.venueId == null) {
+                                        final share = await showEditorialConfirm(
+                                          context: context,
+                                          title: 'Private Location Check-in',
+                                          message:
+                                              'You are checking in at a private location without an official partner venue. Would you like to share your live trip beacon with Velvet Safety?',
+                                          confirmLabel: 'Share Trip & Check In',
+                                          cancelLabel: 'Check In Only',
+                                        );
+                                        if (share == true) {
+                                          _shareTrip();
+                                        }
+                                      }
+
                                       setState(() => _actioning = true);
                                       try {
                                         final pos =
@@ -1027,7 +1080,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
                             const SizedBox(height: 10),
                             VelvetButton(
                               label: booking.counterpartCheckoutConfirmed
-                                  ? 'Confirm checkout — release session payment'
+                                  ? 'Confirm checkout — start 24h safety escrow'
                                   : 'Confirm checkout',
                               variant: VelvetButtonVariant.ghost,
                               loading: _actioning,
@@ -1065,20 +1118,134 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
                             Padding(
                               padding: const EdgeInsets.only(top: 10),
                               child: Text(
-                                'Your checkout is recorded. Waiting for the other member to confirm before payment is released.',
+                                'Your checkout is recorded. Waiting for the other member to confirm checkout.',
                                 style: Theme.of(context).textTheme.bodySmall,
                               ),
                             ),
                         ],
-                        if (booking.status == 'COMPLETED' &&
-                            !booking.feedbackSubmitted) ...[
-                          Container(
-                            key: _feedbackKey,
-                            child: VelvetButton(
-                              label: l10n.meetingFeedbackTitle,
-                              onPressed: () => _showFeedback(booking),
+                        if (booking.status == 'COMPLETED') ...[
+                          if (booking.disputedAt != null)
+                            Container(
+                              padding: const EdgeInsets.all(12),
+                              margin: const EdgeInsets.only(bottom: 10),
+                              decoration: BoxDecoration(
+                                color: Colors.amber.withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(
+                                  color: Colors.amber.withValues(alpha: 0.3),
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  const Icon(
+                                    Icons.shield_outlined,
+                                    color: Colors.amber,
+                                    size: 20,
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Text(
+                                      'Meeting under dispute. Escrow payout is held pending concierge triage.',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodySmall
+                                          ?.copyWith(
+                                            color: Colors.amber,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            )
+                          else if (booking.escrowReleasedAt != null)
+                            Container(
+                              padding: const EdgeInsets.all(12),
+                              margin: const EdgeInsets.only(bottom: 10),
+                              decoration: BoxDecoration(
+                                color: Colors.green.withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(
+                                  color: Colors.green.withValues(alpha: 0.3),
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  const Icon(
+                                    Icons.check_circle_outline,
+                                    color: Colors.green,
+                                    size: 20,
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Text(
+                                      'Session payment settled — escrow released to performer.',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodySmall
+                                          ?.copyWith(
+                                            color: Colors.green,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            )
+                          else ...[
+                            Container(
+                              padding: const EdgeInsets.all(12),
+                              margin: const EdgeInsets.only(bottom: 10),
+                              decoration: BoxDecoration(
+                                color: Colors.blueGrey.withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(
+                                  color: Colors.blueGrey.withValues(alpha: 0.25),
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  const Icon(
+                                    Icons.lock_clock_outlined,
+                                    color: Colors.amberAccent,
+                                    size: 20,
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Text(
+                                      'Meeting completed. 24-hour safety escrow active.',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodySmall
+                                          ?.copyWith(
+                                            color: Colors.white70,
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
-                          ),
+                            VelvetButton(
+                              label: 'File Dispute / Hold Escrow',
+                              variant: VelvetButtonVariant.secondary,
+                              icon: Icons.gavel_outlined,
+                              loading: _actioning,
+                              onPressed: _actioning
+                                  ? null
+                                  : () => _disputeBooking(booking),
+                            ),
+                            const SizedBox(height: 10),
+                          ],
+                          if (!booking.feedbackSubmitted) ...[
+                            Container(
+                              key: _feedbackKey,
+                              child: VelvetButton(
+                                label: l10n.meetingFeedbackTitle,
+                                onPressed: () => _showFeedback(booking),
+                              ),
+                            ),
+                          ],
                         ],
                         const SizedBox(height: 16),
                         VelvetButton(

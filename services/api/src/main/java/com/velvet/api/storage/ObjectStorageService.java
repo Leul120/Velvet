@@ -79,6 +79,14 @@ public class ObjectStorageService {
         return store(userId, "profile", file, Allow.IMAGE);
     }
 
+    public String uploadVaultImage(UUID userId, MultipartFile file) {
+        return store(userId, "vault", file, Allow.IMAGE);
+    }
+
+    public String uploadVoiceIntro(UUID userId, MultipartFile file) {
+        return store(userId, "voice", file, Allow.AUDIO);
+    }
+
     /** Ensures a profile photo URL is an upload owned by this member, not an arbitrary remote URL. */
     public void assertOwnedProfileImage(UUID userId, String url) {
         assertOwnedMediaUrl(userId, url, "profile/");
@@ -136,7 +144,7 @@ public class ObjectStorageService {
         return new ChatUpload(url, resolved.mediaType(), resolved.contentType(), resolved.originalName());
     }
 
-    private enum Allow { IMAGE, CHAT }
+    private enum Allow { IMAGE, AUDIO, CHAT }
 
     private record Resolved(String contentType, String ext, String mediaType, String originalName) {}
 
@@ -174,6 +182,9 @@ public class ObjectStorageService {
         }
         if (allow == Allow.IMAGE && !"IMAGE".equals(mediaType)) {
             throw new BusinessException("FILE_TYPE", "Only JPEG, PNG, WebP, or GIF images are allowed.");
+        }
+        if (allow == Allow.AUDIO && !"AUDIO".equals(mediaType)) {
+            throw new BusinessException("FILE_TYPE", "Only audio files (MP3, M4A, AAC, WAV, OGG) are allowed.");
         }
         if (ext.isBlank()) {
             ext = switch (mediaType) {

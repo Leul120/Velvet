@@ -471,9 +471,6 @@ public class BookingService {
             booking.setEscrowReleaseAt(now.plus(24, ChronoUnit.HOURS));
         }
         bookingRepository.save(booking);
-        if (booking.getStatus() == BookingStatus.COMPLETED) {
-            billingService.settleCompletedBooking(booking.getId());
-        }
         return toResponse(booking, optionalVenue(booking.getVenueId()), userId);
     }
 
@@ -732,7 +729,11 @@ public class BookingService {
                 viewerId != null && hasCounterpartCheckedOut(booking, viewerId),
                 booking.getReminder24hSentAt(),
                 booking.getReminder2hSentAt(),
-                feedbackSubmitted
+                feedbackSubmitted,
+                booking.getEscrowReleaseAt(),
+                booking.getEscrowReleasedAt(),
+                booking.getDisputedAt(),
+                booking.getDisputeNotes()
         );
     }
 
