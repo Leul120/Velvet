@@ -52,6 +52,8 @@ public final class BookingDtos {
             Instant createdAt
     ) {}
 
+    public record DisputeRequest(@Size(max = 500) String notes) {}
+
     public record BookingResponse(
             String id,
             String matchId,
@@ -82,6 +84,10 @@ public final class BookingDtos {
             boolean counterpartCheckoutConfirmed,
             Instant reminder24hSentAt,
             Instant reminder2hSentAt,
-            boolean feedbackSubmitted
+            boolean feedbackSubmitted,
+            Instant escrowReleaseAt,
+            Instant escrowReleasedAt,
+            Instant disputedAt,
+            String disputeNotes
     ) {}
 }

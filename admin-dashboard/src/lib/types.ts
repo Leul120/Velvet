@@ -77,3 +77,36 @@ export interface AuthState {
     role: string;
   } | null;
 }
+
+export interface AdminPayoutItem {
+  id: string;
+  userId: string;
+  displayName: string;
+  phone: string;
+  amountEtb: number;
+  status: 'REQUESTED' | 'COMPLETED' | 'REJECTED';
+  destinationNote?: string | null;
+  adminNotes?: string | null;
+  createdAt: string;
+  processedAt?: string | null;
+}
+
+export interface PhotoReviewItem {
+  userId: string;
+  displayName: string;
+  photoUrls: string[];
+  status: string;
+  notes?: string | null;
+  updatedAt: string;
+}
+
+export interface VerificationCaseItem {
+  id: string;
+  userId: string;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  idDocumentUrl: string;
+  selfieUrl: string;
+  notes?: string | null;
+  createdAt: string;
+  reviewedAt?: string | null;
+}
