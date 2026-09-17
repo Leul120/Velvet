@@ -103,6 +103,10 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
       },
       requestReason: c.likeReason,
       notedPhotoUrl: c.likedPhotoUrl,
+      voiceIntroUrl: c.voiceIntroUrl,
+      availableTonight: c.availableTonight,
+      availableNeighborhood: c.availableNeighborhood,
+      hasVault: c.hasVault,
     );
   }
 

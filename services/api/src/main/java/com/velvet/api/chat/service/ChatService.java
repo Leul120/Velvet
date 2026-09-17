@@ -49,6 +49,7 @@ public class ChatService {
     private final MemberNotifyService memberNotifyService;
     private final UserRepository userRepository;
     private final ObjectStorageService storageService;
+    private final ChatStreamHub chatStreamHub;
 
     public ChatService(
             ChatThreadRepository threadRepository,
@@ -63,7 +64,8 @@ public class ChatService {
             StringRedisTemplate redis,
             MemberNotifyService memberNotifyService,
             UserRepository userRepository,
-            ObjectStorageService storageService
+            ObjectStorageService storageService,
+            ChatStreamHub chatStreamHub
     ) {
         this.threadRepository = threadRepository;
         this.messageRepository = messageRepository;
@@ -78,6 +80,7 @@ public class ChatService {
         this.memberNotifyService = memberNotifyService;
         this.userRepository = userRepository;
         this.storageService = storageService;
+        this.chatStreamHub = chatStreamHub;
     }
 
     @Transactional
@@ -138,6 +141,7 @@ public class ChatService {
         } else {
             redis.delete(key);
         }
+        chatStreamHub.broadcastTyping(matchId, typing);
     }
 
     @Transactional(readOnly = true)
@@ -255,7 +259,11 @@ public class ChatService {
             }
         }
 
-        return toMessage(saved, thread);
+        ChatDtos.MessageResponse response = toMessage(saved, thread);
+        if (status == ModerationStatus.ALLOWED) {
+            chatStreamHub.broadcastMessage(matchId, response);
+        }
+        return response;
     }
 
     private static String blankToNull(String value) {
@@ -302,6 +310,12 @@ public class ChatService {
                 approve ? "STAFF_APPROVE" : "STAFF_BLOCK",
                 "held_review"
         );
+        if (approve) {
+            ChatThreadEntity thread = threadRepository.findById(message.getThreadId()).orElse(null);
+            if (thread != null) {
+                chatStreamHub.broadcastMessage(thread.getConnectionId(), toMessage(message, thread));
+            }
+        }
         return Map.of(
                 "id", message.getId().toString(),
                 "moderationStatus", message.getModerationStatus().name()
@@ -364,7 +378,7 @@ public class ChatService {
                 .orElseGet(() -> openForMatch(match));
     }
 
-    private ConnectionEntity assertParticipant(UUID userId, UUID matchId) {
+    public ConnectionEntity assertParticipant(UUID userId, UUID matchId) {
         ConnectionEntity match = connectionRepository.findById(matchId)
                 .orElseThrow(() -> new BusinessException("MATCH_NOT_FOUND", "Match not found."));
         if (match.getStatus() != MatchStatus.MUTUAL) {

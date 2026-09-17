@@ -65,4 +65,24 @@ public final class SafetyDtos {
             String status,
             Instant createdAt
     ) {}
+
+    public record EmergencyContactRequest(
+            @NotBlank @Size(max = 120) String contactName,
+            @NotBlank @Size(max = 32) String contactPhone,
+            Boolean enabled
+    ) {}
+
+    public record EmergencyContactResponse(
+            String id,
+            String contactName,
+            String contactPhone,
+            boolean enabled,
+            Instant createdAt
+    ) {}
+
+    public record UpdateEmergencyContactRequest(
+            @Size(max = 120) String contactName,
+            @Size(max = 32) String contactPhone,
+            Boolean enabled
+    ) {}
 }

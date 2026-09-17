@@ -23,6 +23,7 @@ import 'package:velvet_mobile/core/widgets/velvet_widgets.dart';
 import 'package:velvet_mobile/features/auth/auth_controller.dart';
 import 'package:velvet_mobile/features/auth/role_helpers.dart';
 import 'package:velvet_mobile/features/profile/profile_api.dart';
+import 'package:velvet_mobile/features/profile/voice_intro_widget.dart';
 import 'package:velvet_mobile/features/settings/locale_provider.dart';
 import 'package:velvet_mobile/features/settings/low_bandwidth_provider.dart';
 import 'package:velvet_mobile/features/social/social_api.dart';
@@ -44,9 +45,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   final _sessionRateCtrl = TextEditingController();
   final _overnightRateCtrl = TextEditingController();
   final _availabilityCtrl = TextEditingController();
+  final _neighborhoodCtrl = TextEditingController();
   DateTime? _dob;
   String? _gender;
   bool _listingActive = true;
+  bool _availableTonight = false;
   bool _saving = false;
   bool _seeded = false;
   final Set<String> _interests = {};
@@ -72,6 +75,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     _sessionRateCtrl.dispose();
     _overnightRateCtrl.dispose();
     _availabilityCtrl.dispose();
+    _neighborhoodCtrl.dispose();
     super.dispose();
   }
 
@@ -90,7 +94,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       _overnightRateCtrl.text = '${me.overnightRateEtb}';
     }
     _availabilityCtrl.text = me.availabilityNote ?? '';
+    _neighborhoodCtrl.text = me.availableNeighborhood ?? '';
     _listingActive = me.listingActive;
+    _availableTonight = me.availableTonight;
     if (me.dateOfBirth != null && me.dateOfBirth!.isNotEmpty) {
       _dob = DateTime.tryParse(me.dateOfBirth!);
     }
@@ -155,6 +161,108 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     }
   }
 
+  Future<void> _pickVaultPhoto() async {
+    final l10n = AppLocalizations.of(context);
+    final source = await showEditorialActionSheet<ImageSource>(
+      context: context,
+      title: 'Add to Private Vault',
+      options: [
+        EditorialSheetOption(
+          value: ImageSource.camera,
+          label: l10n.takePhoto,
+          icon: Icons.photo_camera_outlined,
+        ),
+        EditorialSheetOption(
+          value: ImageSource.gallery,
+          label: l10n.chooseGallery,
+          icon: Icons.photo_library_outlined,
+        ),
+      ],
+    );
+    if (source == null) return;
+    final lowBw = ref.read(lowBandwidthProvider);
+    final file = await ImagePicker().pickImage(
+      source: source,
+      imageQuality: imagePickQuality(lowBw),
+      maxWidth: imagePickMaxWidth(lowBw).toDouble(),
+    );
+    if (file == null) return;
+    try {
+      final api = ref.read(profileApiProvider);
+      final url = await api.uploadVaultPhoto(file.path);
+      await api.addVaultPhoto(url);
+      ref.invalidate(meProfileProvider);
+      if (mounted) {
+        await showVelvetToast(context, message: 'Added to private vault');
+      }
+    } catch (e) {
+      if (mounted) {
+        showVelvetErrorToast(context, message: apiErrorMessage(e));
+      }
+    }
+  }
+
+  Future<void> _removeVaultPhoto(String url) async {
+    final ok = await showEditorialConfirm(
+      context: context,
+      title: 'Remove Vault Photo',
+      message: 'Remove this photo from your private vault? Clients granted access will no longer see it.',
+      confirmLabel: 'Remove',
+      cancelLabel: 'Cancel',
+      destructive: true,
+    );
+    if (ok != true) return;
+    try {
+      await ref.read(profileApiProvider).removeVaultPhoto(url);
+      ref.invalidate(meProfileProvider);
+      if (mounted) {
+        await showVelvetToast(context, message: 'Photo removed from vault');
+      }
+    } catch (e) {
+      if (mounted) {
+        showVelvetErrorToast(context, message: apiErrorMessage(e));
+      }
+    }
+  }
+
+  void _recordVoiceIntro() {
+    showVoiceRecorderSheet(
+      context,
+      onSave: (filePath) async {
+        final api = ref.read(profileApiProvider);
+        final url = await api.uploadVoiceIntro(filePath);
+        await api.setVoiceIntro(url);
+        ref.invalidate(meProfileProvider);
+        if (mounted) {
+          showVelvetToast(context, message: 'Voice intro updated');
+        }
+      },
+    );
+  }
+
+  Future<void> _deleteVoiceIntro() async {
+    final ok = await showEditorialConfirm(
+      context: context,
+      title: 'Delete Voice Intro',
+      message: 'Remove your voice intro recording from your profile?',
+      confirmLabel: 'Delete',
+      cancelLabel: 'Cancel',
+      destructive: true,
+    );
+    if (ok != true) return;
+    try {
+      await ref.read(profileApiProvider).removeVoiceIntro();
+      ref.invalidate(meProfileProvider);
+      if (mounted) {
+        await showVelvetToast(context, message: 'Voice intro removed');
+      }
+    } catch (e) {
+      if (mounted) {
+        showVelvetErrorToast(context, message: apiErrorMessage(e));
+      }
+    }
+  }
+
   Future<void> _save() async {
     setState(() => _saving = true);
     try {
@@ -186,6 +294,12 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                       '${_dob!.month.toString().padLeft(2, '0')}-'
                       '${_dob!.day.toString().padLeft(2, '0')}',
           );
+      if (isPerformer) {
+        await ref.read(profileApiProvider).toggleAvailableTonight(
+          availableTonight: _availableTonight,
+          availableNeighborhood: _neighborhoodCtrl.text.trim(),
+        );
+      }
       // Keep the cached session in sync so role-specific discovery/navigation
       // updates immediately after a member changes this profile setting.
       ref.read(authControllerProvider).setGender(_gender, role: updated.role);
@@ -638,6 +752,146 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                             ),
                           ),
                         ),
+                        if (isPerformer) ...[
+                          const SizedBox(height: 24),
+                          const KineticEyebrow(
+                            label: 'Private Photo Vault',
+                            icon: Icons.lock_outline_rounded,
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            'Share intimate photos exclusively with clients who request access.',
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(color: context.velvet.muted),
+                          ),
+                          const SizedBox(height: 10),
+                          _LiftCard(
+                            padding: const EdgeInsets.all(12),
+                            child: SizedBox(
+                              height: 96,
+                              child: Row(
+                                children: [
+                                  if (me.privatePhotoUrls.isEmpty)
+                                    Expanded(
+                                      child: Center(
+                                        child: Text(
+                                          'No vault photos yet',
+                                          style: Theme.of(context).textTheme.bodySmall
+                                              ?.copyWith(color: context.velvet.muted),
+                                        ),
+                                      ),
+                                    )
+                                  else
+                                    Expanded(
+                                      child: ListView.separated(
+                                        scrollDirection: Axis.horizontal,
+                                        itemCount: me.privatePhotoUrls.length,
+                                        separatorBuilder: (_, __) => const SizedBox(width: 8),
+                                        itemBuilder: (context, index) {
+                                          final url = me.privatePhotoUrls[index];
+                                          return ClipRRect(
+                                            borderRadius: BorderRadius.circular(12),
+                                            child: Stack(
+                                              children: [
+                                                Image.network(
+                                                  resolveMediaUrl(url),
+                                                  width: 88,
+                                                  height: 96,
+                                                  fit: BoxFit.cover,
+                                                ),
+                                                Positioned(
+                                                  top: 4,
+                                                  right: 4,
+                                                  child: CircleAvatar(
+                                                    radius: 13,
+                                                    backgroundColor: Colors.black.withValues(alpha: 0.6),
+                                                    child: IconButton(
+                                                      padding: EdgeInsets.zero,
+                                                      iconSize: 15,
+                                                      color: Colors.white,
+                                                      onPressed: () => _removeVaultPhoto(url),
+                                                      icon: const Icon(Icons.close),
+                                                    ),
+                                                  ),
+                                                ),
+                                                Positioned(
+                                                  bottom: 4,
+                                                  left: 4,
+                                                  child: Container(
+                                                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                                                    decoration: BoxDecoration(
+                                                      color: Colors.black.withValues(alpha: 0.65),
+                                                      borderRadius: BorderRadius.circular(4),
+                                                    ),
+                                                    child: const Row(
+                                                      mainAxisSize: MainAxisSize.min,
+                                                      children: [
+                                                        Icon(Icons.lock_rounded, size: 10, color: VelvetTokens.ember),
+                                                        SizedBox(width: 2),
+                                                        Text(
+                                                          'VAULT',
+                                                          style: TextStyle(
+                                                            color: Colors.white,
+                                                            fontSize: 9,
+                                                            fontWeight: FontWeight.w700,
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          );
+                                        },
+                                      ),
+                                    ),
+                                  const SizedBox(width: 8),
+                                  OutlinedButton(
+                                    onPressed: _pickVaultPhoto,
+                                    style: OutlinedButton.styleFrom(
+                                      minimumSize: const Size(88, 96),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                    ),
+                                    child: const Column(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        Icon(
+                                          Icons.add_photo_alternate_outlined,
+                                          color: VelvetTokens.ember,
+                                        ),
+                                        SizedBox(height: 4),
+                                        Text(
+                                          'Add Vault',
+                                          style: TextStyle(fontSize: 11),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 24),
+                          const KineticEyebrow(
+                            label: 'Voice Intro',
+                            icon: Icons.mic_none_rounded,
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            'A short voice clip gives clients a glimpse of your charm and accent.',
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(color: context.velvet.muted),
+                          ),
+                          const SizedBox(height: 10),
+                          VoiceIntroCard(
+                            voiceIntroUrl: me.voiceIntroUrl,
+                            onRecord: _recordVoiceIntro,
+                            onDelete: _deleteVoiceIntro,
+                          ),
+                        ],
                         const SizedBox(height: 20),
                         _LiftCard(
                           padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
@@ -773,6 +1027,24 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                   label: l10n.availabilityNote,
                                 ),
                                 EditorialToggleRow(
+                                  index: 2,
+                                  title: 'Available Tonight',
+                                  subtitle: _availableTonight
+                                      ? (_neighborhoodCtrl.text.trim().isNotEmpty
+                                          ? 'Active in ${_neighborhoodCtrl.text.trim()}'
+                                          : 'Visible in tonight\'s discover feed')
+                                      : 'Turn on when accepting tonight meets',
+                                  value: _availableTonight,
+                                  onChanged: (v) => setState(() => _availableTonight = v),
+                                ),
+                                if (_availableTonight) ...[
+                                  const SizedBox(height: 8),
+                                  VelvetField(
+                                    controller: _neighborhoodCtrl,
+                                    label: 'Active Neighborhood (e.g. Bole, Kazanchis)',
+                                  ),
+                                ],
+                                EditorialToggleRow(
                                   index: 3,
                                   title: l10n.listingActive,
                                   subtitle: me.status == 'VERIFIED'
@@ -855,6 +1127,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                         _navTile(
                           title: l10n.safetyCenterTitle,
                           onTap: () => context.push('/safety'),
+                        ),
+                        _navTile(
+                          title: 'Emergency Contacts',
+                          icon: Icons.contact_phone_outlined,
+                          onTap: () => context.push('/emergency-contacts'),
                         ),
                         _navTile(
                           title: l10n.verificationTitle,

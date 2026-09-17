@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:just_audio/just_audio.dart';
 import 'package:velvet_mobile/core/network/media_url.dart';
 import 'package:velvet_mobile/core/theme/velvet_editorial_colors.dart';
 import 'package:velvet_mobile/core/theme/velvet_tokens.dart';
@@ -33,6 +34,10 @@ class ListingCardData {
     this.lookingFor,
     this.heightCm,
     this.interests = const [],
+    this.voiceIntroUrl,
+    this.availableTonight = false,
+    this.availableNeighborhood,
+    this.hasVault = false,
   });
 
   final String id;
@@ -56,6 +61,10 @@ class ListingCardData {
   final String? lookingFor;
   final int? heightCm;
   final List<String> interests;
+  final String? voiceIntroUrl;
+  final bool availableTonight;
+  final String? availableNeighborhood;
+  final bool hasVault;
 }
 
 class ListingDetailActions {
@@ -257,16 +266,82 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             if (listing.verified ||
-                                (listing.trustScore ?? 0) >= 80)
+                                (listing.trustScore ?? 0) >= 80 ||
+                                listing.availableTonight ||
+                                listing.hasVault)
                               Padding(
                                 padding: const EdgeInsets.only(bottom: 12),
-                                child: Row(
+                                child: Wrap(
+                                  spacing: 8,
+                                  runSpacing: 6,
                                   children: [
+                                    if (listing.availableTonight)
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 9,
+                                          vertical: 4,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFF10B981).withValues(alpha: 0.9),
+                                          borderRadius: BorderRadius.circular(99),
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Container(
+                                              width: 6,
+                                              height: 6,
+                                              decoration: const BoxDecoration(
+                                                color: Colors.white,
+                                                shape: BoxShape.circle,
+                                              ),
+                                            ),
+                                            const SizedBox(width: 5),
+                                            Text(
+                                              listing.availableNeighborhood?.isNotEmpty == true
+                                                  ? 'TONIGHT · ${listing.availableNeighborhood}'
+                                                  : 'AVAILABLE TONIGHT',
+                                              style: GoogleFonts.syne(
+                                                color: Colors.white,
+                                                fontSize: 10,
+                                                fontWeight: FontWeight.w700,
+                                                letterSpacing: 0.4,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    if (listing.hasVault)
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 8,
+                                          vertical: 4,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: Colors.black.withValues(alpha: 0.65),
+                                          borderRadius: BorderRadius.circular(99),
+                                          border: Border.all(
+                                            color: VelvetTokens.ember.withValues(alpha: 0.6),
+                                          ),
+                                        ),
+                                        child: const Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Icon(Icons.lock_rounded, size: 11, color: VelvetTokens.ember),
+                                            SizedBox(width: 4),
+                                            Text(
+                                              'VAULT',
+                                              style: TextStyle(
+                                                color: Colors.white,
+                                                fontSize: 10,
+                                                fontWeight: FontWeight.w700,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
                                     if (listing.verified)
                                       const VelvetVerifiedBadge(onDark: true),
-                                    if (listing.verified &&
-                                        (listing.trustScore ?? 0) >= 80)
-                                      const SizedBox(width: 8),
                                     if ((listing.trustScore ?? 0) >= 80)
                                       const VelvetTrustedBadge(
                                         compact: true,
@@ -358,6 +433,64 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      if (listing.voiceIntroUrl?.isNotEmpty == true) ...[
+                        _VoiceIntroPlayer(url: listing.voiceIntroUrl!),
+                        const SizedBox(height: 24),
+                      ],
+                      if (listing.hasVault) ...[
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: colors.surface,
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                              color: VelvetTokens.ember.withValues(alpha: 0.3),
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 42,
+                                height: 42,
+                                decoration: BoxDecoration(
+                                  color: VelvetTokens.ember.withValues(alpha: 0.12),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: const Icon(
+                                  Icons.lock_rounded,
+                                  color: VelvetTokens.ember,
+                                  size: 20,
+                                ),
+                              ),
+                              const SizedBox(width: 14),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Private Photo Vault',
+                                      style: GoogleFonts.syne(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w700,
+                                        color: VelvetTokens.ink,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      'Exclusive gallery available upon invitation or booking request.',
+                                      style: GoogleFonts.dmSans(
+                                        fontSize: 12,
+                                        color: colors.muted,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                      ],
                       if (listing.sessionRateEtb != null ||
                           listing.overnightRateEtb != null) ...[
                         Text(
@@ -800,6 +933,122 @@ class _ActionDock extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _VoiceIntroPlayer extends StatefulWidget {
+  const _VoiceIntroPlayer({required this.url});
+  final String url;
+
+  @override
+  State<_VoiceIntroPlayer> createState() => _VoiceIntroPlayerState();
+}
+
+class _VoiceIntroPlayerState extends State<_VoiceIntroPlayer> {
+  AudioPlayer? _player;
+  bool _isPlaying = false;
+  Duration _position = Duration.zero;
+  Duration _duration = Duration.zero;
+
+  @override
+  void dispose() {
+    _player?.dispose();
+    super.dispose();
+  }
+
+  Future<void> _toggle() async {
+    if (_player == null) {
+      _player = AudioPlayer();
+      _player!.positionStream.listen((pos) {
+        if (mounted) setState(() => _position = pos);
+      });
+      _player!.durationStream.listen((dur) {
+        if (mounted && dur != null) setState(() => _duration = dur);
+      });
+      _player!.playerStateStream.listen((state) {
+        if (mounted) {
+          final done = state.processingState == ProcessingState.completed;
+          setState(() {
+            _isPlaying = state.playing && !done;
+            if (done) _position = Duration.zero;
+          });
+        }
+      });
+      try {
+        await _player!.setUrl(resolveMediaUrl(widget.url));
+      } catch (_) {
+        return;
+      }
+    }
+
+    if (_isPlaying) {
+      await _player!.pause();
+    } else {
+      if (_player!.processingState == ProcessingState.completed) {
+        await _player!.seek(Duration.zero);
+      }
+      await _player!.play();
+    }
+  }
+
+  String _formatDuration(Duration d) {
+    final m = d.inMinutes;
+    final s = d.inSeconds % 60;
+    return '$m:${s.toString().padLeft(2, '0')}';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.velvet;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: colors.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: colors.cardBorder),
+      ),
+      child: Row(
+        children: [
+          CircleAvatar(
+            radius: 20,
+            backgroundColor: VelvetTokens.ember.withValues(alpha: 0.15),
+            child: IconButton(
+              iconSize: 22,
+              color: VelvetTokens.ember,
+              icon: Icon(_isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded),
+              onPressed: _toggle,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Voice Introduction',
+                  style: GoogleFonts.syne(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: VelvetTokens.ink,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  _duration > Duration.zero
+                      ? '${_formatDuration(_position)} / ${_formatDuration(_duration)}'
+                      : 'Listen to personal audio greeting',
+                  style: GoogleFonts.dmSans(
+                    fontSize: 11,
+                    color: colors.muted,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const Icon(Icons.graphic_eq_rounded, color: VelvetTokens.ember, size: 24),
+        ],
       ),
     );
   }

@@ -1,6 +1,7 @@
 package com.velvet.api.chat.web;
 
 import com.velvet.api.chat.service.ChatService;
+import com.velvet.api.chat.service.ChatStreamHub;
 import com.velvet.api.chat.web.dto.ChatDtos;
 import com.velvet.api.identity.security.VelvetPrincipal;
 import jakarta.validation.Valid;
@@ -15,18 +16,17 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 
 @RestController
 @RequestMapping("/v1/chat")
 public class ChatController {
 
     private final ChatService chatService;
-    private final ExecutorService sseExecutor = Executors.newCachedThreadPool();
+    private final ChatStreamHub chatStreamHub;
 
-    public ChatController(ChatService chatService) {
+    public ChatController(ChatService chatService, ChatStreamHub chatStreamHub) {
         this.chatService = chatService;
+        this.chatStreamHub = chatStreamHub;
     }
 
     @GetMapping({"/matches/{connectionId}", "/connections/{connectionId}"})
@@ -47,7 +47,8 @@ public class ChatController {
     }
 
     /**
-     * Near-realtime: ~1.5s DB poll + typing pulses over SSE while connected.
+     * Event-driven SSE: broadcasts instant messages & typing events via ChatStreamHub,
+     * with periodic keep-alive pings. Zero thread starvation and zero DB polling storm.
      */
     @GetMapping(
             path = {"/matches/{connectionId}/stream", "/connections/{connectionId}/stream"},
@@ -59,39 +60,30 @@ public class ChatController {
             @RequestParam(required = false) Instant after
     ) {
         UUID userId = principal.getUserId();
-        SseEmitter emitter = new SseEmitter(5 * 60_000L);
-        Instant[] cursor = {after == null ? Instant.EPOCH : after};
-        boolean[] lastTyping = {false};
-        sseExecutor.execute(() -> {
-            try {
-                // ~5 minutes at 1.5s cadence
-                for (int i = 0; i < 200; i++) {
-                    List<ChatDtos.MessageResponse> batch = chatService.messagesAfter(userId, connectionId, cursor[0]);
-                    for (ChatDtos.MessageResponse msg : batch) {
-                        emitter.send(SseEmitter.event().name("message").data(msg));
-                        if (msg.createdAt() != null && msg.createdAt().isAfter(cursor[0])) {
-                            cursor[0] = msg.createdAt();
-                        }
-                    }
-                    boolean typing = chatService.isPeerTyping(userId, connectionId);
-                    if (typing != lastTyping[0] || i % 4 == 0) {
-                        lastTyping[0] = typing;
-                        emitter.send(SseEmitter.event().name("typing").data(Map.of("peerTyping", typing)));
-                    }
-                    if (i % 8 == 0) {
-                        emitter.send(SseEmitter.event().name("ping").data(Map.of("t", Instant.now().toString())));
-                    }
-                    Thread.sleep(1_500L);
+        chatService.assertParticipant(userId, connectionId);
+
+        SseEmitter emitter = new SseEmitter(10 * 60_000L);
+
+        // Catch up any messages after cursor if requested
+        if (after != null) {
+            List<ChatDtos.MessageResponse> catchup = chatService.messagesAfter(userId, connectionId, after);
+            for (ChatDtos.MessageResponse msg : catchup) {
+                try {
+                    emitter.send(SseEmitter.event().name("message").data(msg));
+                } catch (IOException e) {
+                    emitter.complete();
+                    return emitter;
                 }
-                emitter.complete();
-            } catch (IOException | InterruptedException e) {
-                emitter.completeWithError(e);
-                Thread.currentThread().interrupt();
-            } catch (Exception e) {
-                emitter.completeWithError(e);
             }
-        });
-        emitter.onTimeout(emitter::complete);
+        }
+
+        // Send initial typing status
+        boolean typing = chatService.isPeerTyping(userId, connectionId);
+        try {
+            emitter.send(SseEmitter.event().name("typing").data(Map.of("peerTyping", typing)));
+        } catch (IOException ignored) {}
+
+        chatStreamHub.register(connectionId, emitter);
         return emitter;
     }
 

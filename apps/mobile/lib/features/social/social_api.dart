@@ -203,6 +203,10 @@ class BookingItem {
     this.reminder24hSentAt,
     this.reminder2hSentAt,
     this.feedbackSubmitted = false,
+    this.escrowReleaseAt,
+    this.escrowReleasedAt,
+    this.disputedAt,
+    this.disputeNotes,
   });
 
   final String id;
@@ -234,6 +238,10 @@ class BookingItem {
   final DateTime? reminder24hSentAt;
   final DateTime? reminder2hSentAt;
   final bool feedbackSubmitted;
+  final DateTime? escrowReleaseAt;
+  final DateTime? escrowReleasedAt;
+  final DateTime? disputedAt;
+  final String? disputeNotes;
 
   String get placeLabel =>
       (meetupPlace != null && meetupPlace!.trim().isNotEmpty)
@@ -289,6 +297,16 @@ class BookingItem {
         ? DateTime.tryParse(json['reminder2hSentAt'] as String)
         : null,
     feedbackSubmitted: json['feedbackSubmitted'] as bool? ?? false,
+    escrowReleaseAt: json['escrowReleaseAt'] != null
+        ? DateTime.tryParse(json['escrowReleaseAt'] as String)
+        : null,
+    escrowReleasedAt: json['escrowReleasedAt'] != null
+        ? DateTime.tryParse(json['escrowReleasedAt'] as String)
+        : null,
+    disputedAt: json['disputedAt'] != null
+        ? DateTime.tryParse(json['disputedAt'] as String)
+        : null,
+    disputeNotes: json['disputeNotes'] as String?,
   );
 }
 
@@ -526,6 +544,14 @@ class BookingApi {
     return BookingItem.fromJson(res.data as Map<String, dynamic>);
   }
 
+  Future<BookingItem> dispute(String bookingId, {String? notes}) async {
+    final res = await _dio.post(
+      '/v1/bookings/$bookingId/dispute',
+      data: {'notes': ?notes},
+    );
+    return BookingItem.fromJson(res.data as Map<String, dynamic>);
+  }
+
   Future<void> submitFeedback({
     required String bookingId,
     required bool feltSafe,
@@ -656,6 +682,77 @@ class SafetyApi {
       },
     );
   }
+
+  Future<List<EmergencyContactItem>> listEmergencyContacts() async {
+    final res = await _dio.get('/v1/safety/emergency-contacts');
+    return (res.data as List<dynamic>)
+        .map((e) => EmergencyContactItem.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<EmergencyContactItem> addEmergencyContact({
+    required String name,
+    required String phone,
+    bool enabled = true,
+  }) async {
+    final res = await _dio.post(
+      '/v1/safety/emergency-contacts',
+      data: {
+        'contactName': name,
+        'contactPhone': phone,
+        'enabled': enabled,
+      },
+    );
+    return EmergencyContactItem.fromJson(res.data as Map<String, dynamic>);
+  }
+
+  Future<EmergencyContactItem> updateEmergencyContact(
+    String id, {
+    String? name,
+    String? phone,
+    bool? enabled,
+  }) async {
+    final res = await _dio.patch(
+      '/v1/safety/emergency-contacts/$id',
+      data: {
+        'contactName': ?name,
+        'contactPhone': ?phone,
+        'enabled': ?enabled,
+      },
+    );
+    return EmergencyContactItem.fromJson(res.data as Map<String, dynamic>);
+  }
+
+  Future<void> deleteEmergencyContact(String id) async {
+    await _dio.delete('/v1/safety/emergency-contacts/$id');
+  }
+}
+
+class EmergencyContactItem {
+  EmergencyContactItem({
+    required this.id,
+    required this.name,
+    required this.phone,
+    this.enabled = true,
+    this.createdAt,
+  });
+
+  final String id;
+  final String name;
+  final String phone;
+  bool enabled;
+  final DateTime? createdAt;
+
+  factory EmergencyContactItem.fromJson(Map<String, dynamic> json) =>
+      EmergencyContactItem(
+        id: json['id'] as String,
+        name: json['contactName'] as String,
+        phone: json['contactPhone'] as String,
+        enabled: json['enabled'] as bool? ?? true,
+        createdAt: json['createdAt'] != null
+            ? DateTime.tryParse(json['createdAt'] as String)
+            : null,
+      );
 }
 
 class BlockedMember {

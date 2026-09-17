@@ -397,6 +397,22 @@ public class ProfileService {
     }
 
     @Transactional
+    public ProfileDtos.MeResponse removePrivatePhoto(UUID userId, String url) {
+        if (url == null || url.isBlank()) {
+            throw new BusinessException("URL_REQUIRED", "Photo URL is required.");
+        }
+        UserEntity user = requireActiveAccount(userId);
+        MemberProfileEntity profile = profileRepository.findById(userId)
+                .orElseThrow(() -> new BusinessException("PROFILE_NOT_FOUND", "Profile not found."));
+
+        List<String> privates = new ArrayList<>(profile.getPrivatePhotoUrls() == null ? List.of() : profile.getPrivatePhotoUrls());
+        privates.removeIf(u -> u.equals(url.trim()));
+        profile.setPrivatePhotoUrls(privates);
+        profileRepository.save(profile);
+        return toMe(user, profile, userId);
+    }
+
+    @Transactional
     public ProfileDtos.MeResponse toggleAvailableTonight(UUID userId, ProfileDtos.ToggleAvailableTonightRequest request) {
         UserEntity user = requireActiveAccount(userId);
         MemberProfileEntity profile = profileRepository.findById(userId)
@@ -417,6 +433,17 @@ public class ProfileService {
                 .orElseGet(() -> MemberProfileEntity.builder().userId(userId).build());
 
         profile.setVoiceIntroUrl(request.voiceIntroUrl().trim());
+        profileRepository.save(profile);
+        return toMe(user, profile, userId);
+    }
+
+    @Transactional
+    public ProfileDtos.MeResponse clearVoiceIntro(UUID userId) {
+        UserEntity user = requireActiveAccount(userId);
+        MemberProfileEntity profile = profileRepository.findById(userId)
+                .orElseGet(() -> MemberProfileEntity.builder().userId(userId).build());
+
+        profile.setVoiceIntroUrl(null);
         profileRepository.save(profile);
         return toMe(user, profile, userId);
     }
