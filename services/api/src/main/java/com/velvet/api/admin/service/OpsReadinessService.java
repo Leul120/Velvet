@@ -24,12 +24,23 @@ public class OpsReadinessService {
         out.put("cbe", cbe());
         out.put("telebirr", telebirr());
         out.put("moderation", moderation());
+        out.put("storage", storage());
         out.put("otpExpose", properties.otp() != null && properties.otp().exposeInResponse());
         out.put("geofenceRequired", properties.concierge() != null && properties.concierge().requireGeofence());
         out.put("legalVersion", properties.legal() == null ? null : properties.legal().documentSetVersion());
         out.put("readyForSoftLaunch", softLaunchReady(out));
         out.put("readyForProduction", productionReady(out));
         return out;
+    }
+
+    private Map<String, Object> storage() {
+        VelvetProperties.Storage cfg = properties.storage();
+        Map<String, Object> m = new LinkedHashMap<>();
+        boolean usesCloudinary = cfg != null && cfg.usesCloudinary();
+        m.put("activeProvider", usesCloudinary ? "cloudinary" : "s3");
+        m.put("cloudinaryConfigured", cfg != null && cfg.isCloudinaryConfigured());
+        m.put("s3Configured", cfg != null && cfg.isS3Configured());
+        return m;
     }
 
     private String billingProvider() {

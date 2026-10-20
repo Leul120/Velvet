@@ -8,7 +8,7 @@ RUN mkdir -p /out \
     && if [ -f target/velvet-api-0.1.0-SNAPSHOT.jar ]; then \
          cp target/velvet-api-0.1.0-SNAPSHOT.jar /out/app.jar; \
        else \
-         chmod +x mvnw && ./mvnw -DskipTests package \
+         sed -i 's/\r$//' mvnw && chmod +x mvnw && ./mvnw -DskipTests package \
          && cp target/velvet-api-0.1.0-SNAPSHOT.jar /out/app.jar; \
        fi
 

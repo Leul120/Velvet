@@ -1,7 +1,11 @@
 package com.velvet.api.storage;
 
+import com.cloudinary.Cloudinary;
+import com.cloudinary.utils.ObjectUtils;
 import com.velvet.api.common.api.BusinessException;
 import com.velvet.api.common.config.VelvetProperties;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import software.amazon.awssdk.core.ResponseInputStream;
@@ -17,6 +21,8 @@ import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.HttpURLConnection;
+import java.net.URI;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
@@ -24,6 +30,8 @@ import java.util.UUID;
 
 @Service
 public class ObjectStorageService {
+
+    private static final Logger log = LoggerFactory.getLogger(ObjectStorageService.class);
 
     private static final Set<String> IMAGE_TYPES = Set.of("image/jpeg", "image/png", "image/webp", "image/gif");
     private static final Set<String> VIDEO_TYPES = Set.of("video/mp4", "video/quicktime", "video/webm", "video/3gpp");
@@ -63,11 +71,13 @@ public class ObjectStorageService {
     );
 
     private final S3Client s3;
+    private final Cloudinary cloudinary;
     private final VelvetProperties properties;
     private volatile boolean bucketReady;
 
-    public ObjectStorageService(S3Client s3, VelvetProperties properties) {
+    public ObjectStorageService(S3Client s3, Cloudinary cloudinary, VelvetProperties properties) {
         this.s3 = s3;
+        this.cloudinary = cloudinary;
         this.properties = properties;
     }
 
@@ -95,13 +105,25 @@ public class ObjectStorageService {
     /** Deletes a member's listing photo as part of account erasure. */
     public void deleteOwnedProfileImage(UUID userId, String url) {
         String key = ownedMediaKey(userId, url, "profile/");
+        boolean deleted = false;
+        if (properties.storage() != null && properties.storage().usesCloudinary()) {
+            try {
+                cloudinary.uploader().destroy("velvet/" + key, ObjectUtils.asMap("resource_type", "image"));
+                deleted = true;
+            } catch (Exception e) {
+                log.warn("Cloudinary delete failed for {}: {}", key, e.getMessage());
+            }
+        }
         try {
             s3.deleteObject(DeleteObjectRequest.builder()
                     .bucket(properties.storage().bucket())
                     .key(key)
                     .build());
+            deleted = true;
         } catch (Exception e) {
-            throw new BusinessException("MEDIA_DELETE_FAILED", "Could not remove a profile photo during account erasure.");
+            if (!deleted) {
+                throw new BusinessException("MEDIA_DELETE_FAILED", "Could not remove a profile photo during account erasure.");
+            }
         }
     }
 
@@ -211,6 +233,30 @@ public class ObjectStorageService {
         if (key == null || key.isBlank() || key.contains("..") || key.startsWith("/")) {
             throw new BusinessException("NOT_FOUND", "Media not found.");
         }
+
+        boolean useCloudinary = properties.storage() != null && properties.storage().usesCloudinary();
+        if (useCloudinary) {
+            MediaStream stream = openFromCloudinary(key);
+            if (stream != null) {
+                return stream;
+            }
+            return openFromS3(key);
+        } else {
+            try {
+                return openFromS3(key);
+            } catch (BusinessException ex) {
+                if (properties.storage() != null && properties.storage().isCloudinaryConfigured()) {
+                    MediaStream stream = openFromCloudinary(key);
+                    if (stream != null) {
+                        return stream;
+                    }
+                }
+                throw ex;
+            }
+        }
+    }
+
+    private MediaStream openFromS3(String key) {
         ensureBucket();
         try {
             ResponseInputStream<GetObjectResponse> stream = s3.getObject(
@@ -228,23 +274,60 @@ public class ObjectStorageService {
         }
     }
 
-    private String put(UUID userId, String folder, MultipartFile file, Resolved resolved) {
-        ensureBucket();
-        String key = "%s/%s/%s.%s".formatted(folder, userId, UUID.randomUUID(), resolved.ext());
+    private MediaStream openFromCloudinary(String key) {
+        String ext = extensionOf(key);
+        String resourceType = resourceTypeFromExtension(ext);
+        String cloudinaryUrl = cloudinary.url().resourceType(resourceType).secure(true).generate("velvet/" + key);
+
         try {
-            s3.putObject(
-                    PutObjectRequest.builder()
-                            .bucket(properties.storage().bucket())
-                            .key(key)
-                            .contentType(resolved.contentType())
-                            .build(),
-                    RequestBody.fromBytes(file.getBytes())
-            );
-        } catch (IOException e) {
-            throw new BusinessException("UPLOAD_FAILED", "Could not store file.");
+            HttpURLConnection conn = (HttpURLConnection) URI.create(cloudinaryUrl).toURL().openConnection();
+            conn.setRequestMethod("GET");
+            conn.setConnectTimeout(5000);
+            conn.setReadTimeout(15000);
+            int code = conn.getResponseCode();
+            if (code >= 200 && code < 300) {
+                InputStream in = conn.getInputStream();
+                String contentType = conn.getContentType();
+                if (contentType == null || contentType.isBlank()) {
+                    contentType = EXT_MIME.getOrDefault(ext, "application/octet-stream");
+                }
+                long length = conn.getContentLengthLong();
+                return new MediaStream(in, contentType, length);
+            }
+            // If not found with inferred type, check other resource types
+            if (code == 404) {
+                for (String altType : new String[]{"image", "video", "raw"}) {
+                    if (altType.equals(resourceType)) continue;
+                    String altUrl = cloudinary.url().resourceType(altType).secure(true).generate("velvet/" + key);
+                    HttpURLConnection altConn = (HttpURLConnection) URI.create(altUrl).toURL().openConnection();
+                    altConn.setRequestMethod("GET");
+                    altConn.setConnectTimeout(3000);
+                    altConn.setReadTimeout(10000);
+                    if (altConn.getResponseCode() >= 200 && altConn.getResponseCode() < 300) {
+                        String cType = altConn.getContentType();
+                        if (cType == null || cType.isBlank()) {
+                            cType = EXT_MIME.getOrDefault(ext, "application/octet-stream");
+                        }
+                        return new MediaStream(altConn.getInputStream(), cType, altConn.getContentLengthLong());
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.debug("Cloudinary open failed for key {}: {}", key, e.getMessage());
         }
-        // Relative API path — clients resolve against API_BASE (works on emulator + LAN phones).
-        // Legacy absolute MinIO URLs still work via client rewrite.
+        return null;
+    }
+
+    private String put(UUID userId, String folder, MultipartFile file, Resolved resolved) {
+        String key = "%s/%s/%s.%s".formatted(folder, userId, UUID.randomUUID(), resolved.ext());
+        boolean useCloudinary = properties.storage() != null && properties.storage().usesCloudinary();
+
+        if (useCloudinary) {
+            putCloudinary(key, file, resolved);
+        } else {
+            putS3(key, file, resolved);
+        }
+
         String configured = properties.storage().publicBaseUrl() == null
                 ? ""
                 : properties.storage().publicBaseUrl().trim();
@@ -256,6 +339,65 @@ public class ObjectStorageService {
         }
         return configured.replaceAll("/$", "")
                 + "/" + properties.storage().bucket() + "/" + key;
+    }
+
+    private void putCloudinary(String key, MultipartFile file, Resolved resolved) {
+        try {
+            String resourceType = cloudinaryResourceType(resolved.mediaType());
+            Map<String, Object> params = ObjectUtils.asMap(
+                    "public_id", "velvet/" + key,
+                    "resource_type", resourceType,
+                    "overwrite", true
+            );
+            cloudinary.uploader().upload(file.getBytes(), params);
+            log.info("Uploaded to Cloudinary (type={}): velvet/{}", resourceType, key);
+        } catch (Exception e) {
+            log.error("Cloudinary upload failed for key: {}", key, e);
+            // Fallback to S3 if Cloudinary upload fails
+            try {
+                log.warn("Attempting fallback to S3 for key: {}", key);
+                putS3(key, file, resolved);
+            } catch (Exception s3Ex) {
+                throw new BusinessException("UPLOAD_FAILED", "Could not store file.");
+            }
+        }
+    }
+
+    private void putS3(String key, MultipartFile file, Resolved resolved) {
+        ensureBucket();
+        try {
+            s3.putObject(
+                    PutObjectRequest.builder()
+                            .bucket(properties.storage().bucket())
+                            .key(key)
+                            .contentType(resolved.contentType())
+                            .build(),
+                    RequestBody.fromBytes(file.getBytes())
+            );
+        } catch (Exception e) {
+            // If S3 fails and Cloudinary is configured, fallback to Cloudinary
+            if (properties.storage() != null && properties.storage().isCloudinaryConfigured()) {
+                log.warn("S3 put failed, falling back to Cloudinary for key {}: {}", key, e.getMessage());
+                putCloudinary(key, file, resolved);
+                return;
+            }
+            throw new BusinessException("UPLOAD_FAILED", "Could not store file.");
+        }
+    }
+
+    private String cloudinaryResourceType(String mediaType) {
+        return switch (mediaType) {
+            case "VIDEO", "AUDIO" -> "video";
+            case "IMAGE" -> "image";
+            default -> "raw";
+        };
+    }
+
+    private String resourceTypeFromExtension(String ext) {
+        String mime = EXT_MIME.getOrDefault(ext, "");
+        if (IMAGE_TYPES.contains(mime)) return "image";
+        if (VIDEO_TYPES.contains(mime) || AUDIO_TYPES.contains(mime)) return "video";
+        return "raw";
     }
 
     private static String extensionOf(String name) {

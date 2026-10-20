@@ -1,7 +1,7 @@
 # Activate with: SPRING_PROFILES_ACTIVE=prod  (and VELVET_ENV=production)
 # See docs/ops/production-checklist.md
 velvet:
-  env: production
+  env: ${VELVET_ENV:production}
   otp:
     expose-in-response: false
   jobs:
@@ -14,11 +14,11 @@ velvet:
   concierge:
     require-geofence: true
   cbe-verifier:
-    mode: live
+    mode: ${CBE_VERIFIER_MODE:live}
   sms:
-    provider: http
+    provider: ${SMS_PROVIDER:http}
   push:
-    provider: http
+    provider: ${PUSH_PROVIDER:http}
   moderation:
     # Prefer http NLP in production when available; rule remains a safe fallback if unset carefully
     provider: ${MODERATION_PROVIDER:rule}

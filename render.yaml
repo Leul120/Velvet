@@ -1,24 +1,152 @@
+# ==============================================================================
+# VELVET API - Render Blueprint Specification
+# Docs: https://render.com/docs/blueprint-spec
+# ==============================================================================
 services:
+  # ----------------------------------------------------------------------------
+  # 1. Velvet Backend API (Spring Boot 3.4 in Docker)
+  # ----------------------------------------------------------------------------
   - type: web
     name: velvet-api
-    env: docker
+    runtime: docker
     dockerfilePath: ./services/api/Dockerfile
     dockerContext: ./services/api
     plan: free
     region: frankfurt
+    healthCheckPath: /actuator/health
     envVars:
+      # Spring Profile & Runtime Environment
       - key: SPRING_PROFILES_ACTIVE
         value: prod
-      - key: DB_URL
+      # Set to 'production' for full live validation or 'staging' for soft-launch
+      - key: VELVET_ENV
+        value: production
+
+      # PostgreSQL Database Connection (Injected directly from velvet-db)
+      - key: DB_HOST
         fromDatabase:
           name: velvet-db
-          property: connectionString
+          property: host
+      - key: DB_PORT
+        fromDatabase:
+          name: velvet-db
+          property: port
+      - key: DB_NAME
+        fromDatabase:
+          name: velvet-db
+          property: database
+      - key: DB_USER
+        fromDatabase:
+          name: velvet-db
+          property: user
+      - key: DB_PASSWORD
+        fromDatabase:
+          name: velvet-db
+          property: password
+
+      # Redis / KeyValue Connection (Injected from velvet-redis)
+      - key: REDIS_HOST
+        fromService:
+          type: keyvalue
+          name: velvet-redis
+          property: host
+      - key: REDIS_PORT
+        fromService:
+          type: keyvalue
+          name: velvet-redis
+          property: port
+
+      # Security & JWT
+      - key: JWT_SECRET
+        generateValue: true
+      - key: OTP_EXPOSE
+        value: "false"
+      - key: CORS_ORIGINS
+        value: "https://velvet.onrender.com,http://localhost:3000"
+
+      # Optimization & Data Persistence
       - key: VELVET_SEED_RESET
         value: "false"
+      - key: ADMIN_BOOTSTRAP_PHONE
+        value: "+251911999999"
 
+      # Media Storage (Cloudinary fallback when S3 is not available)
+      - key: STORAGE_PROVIDER
+        value: auto
+      - key: S3_PUBLIC_BASE
+        value: relative
+      # Cloudinary configuration (Set in Render Dashboard: CLOUDINARY_URL or CLOUDINARY_CLOUD_NAME, etc.)
+      - key: CLOUDINARY_URL
+        sync: false
+      - key: CLOUDINARY_CLOUD_NAME
+        sync: false
+      - key: CLOUDINARY_API_KEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false
+
+      # S3 / MinIO configuration (optional if Cloudinary is used)
+      - key: S3_REGION
+        value: us-east-1
+      - key: S3_BUCKET
+        value: velvet
+      - key: S3_ENDPOINT
+        sync: false
+      - key: S3_ACCESS_KEY
+        sync: false
+      - key: S3_SECRET_KEY
+        sync: false
+
+      # CBE Payment & Verifier Config
+      - key: BILLING_PROVIDER
+        value: cbe
+      - key: CBE_VERIFIER_MODE
+        value: live
+      - key: CBE_VERIFIER_BASE_URL
+        value: https://verifyapi.leulzenebe.pro
+      - key: CBE_ACCOUNT_NAME
+        value: "VELVET Ethiopia"
+      - key: CBE_VERIFIER_API_KEY
+        sync: false
+      - key: CBE_ACCOUNT_NUMBER
+        sync: false
+      - key: CBE_ACCOUNT_SUFFIX
+        sync: false
+
+      # SMS Gateway Configuration
+      - key: SMS_PROVIDER
+        value: http
+      - key: SMS_SENDER_ID
+        value: VELVET
+      - key: SMS_HTTP_URL
+        sync: false
+      - key: SMS_API_KEY
+        sync: false
+
+      # Push Notification (FCM Proxy)
+      - key: PUSH_PROVIDER
+        value: http
+      - key: PUSH_HTTP_URL
+        sync: false
+      - key: PUSH_API_KEY
+        sync: false
+
+  # ----------------------------------------------------------------------------
+  # 2. Redis Key-Value Store (For OTPs, sessions, & rate limits)
+  # ----------------------------------------------------------------------------
+  - type: keyvalue
+    name: velvet-redis
+    region: frankfurt
+    plan: free
+    ipAllowList: [] # Private network only
+
+# ------------------------------------------------------------------------------
+# 3. PostgreSQL Database
+# ------------------------------------------------------------------------------
 databases:
   - name: velvet-db
+    region: frankfurt
     plan: free
     databaseName: velvet
     user: velvet
-
+    postgresMajorVersion: "16"

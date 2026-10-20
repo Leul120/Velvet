@@ -32,13 +32,43 @@ public record VelvetProperties(
     public record Admin(String bootstrapPhone) {}
     public record Jobs(long matchExpiryMs, long subscriptionExpiryMs, long bookingReminderMs, long dataRetentionMs) {}
     public record Storage(
+            String provider,
             String endpoint,
             String region,
             String accessKey,
             String secretKey,
             String bucket,
-            String publicBaseUrl
-    ) {}
+            String publicBaseUrl,
+            String cloudinaryUrl,
+            String cloudName,
+            String cloudinaryApiKey,
+            String cloudinaryApiSecret
+    ) {
+        public boolean isCloudinaryConfigured() {
+            return (cloudinaryUrl != null && !cloudinaryUrl.isBlank())
+                    || (cloudName != null && !cloudName.isBlank()
+                    && cloudinaryApiKey != null && !cloudinaryApiKey.isBlank()
+                    && cloudinaryApiSecret != null && !cloudinaryApiSecret.isBlank());
+        }
+
+        public boolean isS3Configured() {
+            return endpoint != null && !endpoint.isBlank()
+                    && accessKey != null && !accessKey.isBlank()
+                    && secretKey != null && !secretKey.isBlank()
+                    && !"http://localhost:9000".equals(endpoint.trim());
+        }
+
+        public boolean usesCloudinary() {
+            if ("cloudinary".equalsIgnoreCase(provider)) {
+                return true;
+            }
+            if ("s3".equalsIgnoreCase(provider)) {
+                return false;
+            }
+            // In auto mode, use Cloudinary whenever configured (fallback when S3 is unavailable/unconfigured)
+            return isCloudinaryConfigured();
+        }
+    }
     public record Telebirr(
             String mode,
             String mockBaseUrl,
